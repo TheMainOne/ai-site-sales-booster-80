@@ -17,7 +17,6 @@ const PrivacyPolicy = () => {
               Back to home
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold text-foreground">Privacy Policy</h1>
         </div>
       </header>
 
@@ -148,8 +147,8 @@ const PrivacyPolicy = () => {
                   If you have any questions about this Privacy Policy or our data practices, 
                   please contact us at:
                 </p>
+                                  <p className="text-foreground font-medium">AI-Consultant Widget</p>
                 <div className="bg-muted p-4 rounded-lg">
-                  <p className="text-foreground font-medium">AI-Consultant Widget</p>
                   <p className="text-muted-foreground">Email: privacy@ai-consultant-widget.com</p>
                   <p className="text-muted-foreground">Address: [Your Company Address]</p>
                 </div>
