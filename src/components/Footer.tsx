@@ -55,7 +55,14 @@ const Footer = () => {
                 </Link>
               </li>
               <li><a href="#" className="text-cream/80 hover:text-white transition-colors">Terms of Service</a></li>
-              <li><a href="#" className="text-cream/80 hover:text-white transition-colors">GDPR</a></li>
+              <li>
+                                                <Link
+                  to="/gdpr"
+                  className="text-cream/80 hover:text-white transition-colors"
+                >
+                  GDPR
+                </Link>
+              </li>
               <li><a href="#" className="text-cream/80 hover:text-white transition-colors">Security</a></li>
             </ul>
           </div>

@@ -48,50 +48,50 @@ const GDPR = () => {
                   As a data subject under GDPR, you have the following rights regarding your personal data:
                 </p>
                 <div className="space-y-4">
+                   <h3 className="text-lg font-medium text-foreground mb-2">Right to Information</h3>
                   <div className="bg-muted p-4 rounded-lg">
-                    <h3 className="text-lg font-medium text-foreground mb-2">Right to Information</h3>
                     <p className="text-muted-foreground">
                       You have the right to know how your personal data is being processed, 
                       including what data we collect and how we use it.
                     </p>
                   </div>
+                                      <h3 className="text-lg font-medium text-foreground mb-2">Right of Access</h3>
                   <div className="bg-muted p-4 rounded-lg">
-                    <h3 className="text-lg font-medium text-foreground mb-2">Right of Access</h3>
                     <p className="text-muted-foreground">
                       You can request access to the personal data we hold about you and 
                       receive a copy of this data in a commonly used electronic format.
                     </p>
                   </div>
+                                      <h3 className="text-lg font-medium text-foreground mb-2">Right to Rectification</h3>
                   <div className="bg-muted p-4 rounded-lg">
-                    <h3 className="text-lg font-medium text-foreground mb-2">Right to Rectification</h3>
                     <p className="text-muted-foreground">
                       You have the right to have inaccurate personal data corrected 
                       and incomplete data completed.
                     </p>
                   </div>
+                                      <h3 className="text-lg font-medium text-foreground mb-2">Right to Erasure (Right to be Forgotten)</h3>
                   <div className="bg-muted p-4 rounded-lg">
-                    <h3 className="text-lg font-medium text-foreground mb-2">Right to Erasure (Right to be Forgotten)</h3>
                     <p className="text-muted-foreground">
                       You can request the deletion of your personal data when it is no longer 
                       necessary for the original purpose or when you withdraw consent.
                     </p>
                   </div>
+                                      <h3 className="text-lg font-medium text-foreground mb-2">Right to Restrict Processing</h3>
                   <div className="bg-muted p-4 rounded-lg">
-                    <h3 className="text-lg font-medium text-foreground mb-2">Right to Restrict Processing</h3>
                     <p className="text-muted-foreground">
                       You can request the limitation of processing of your personal data 
                       in certain circumstances.
                     </p>
                   </div>
+                                      <h3 className="text-lg font-medium text-foreground mb-2">Right to Data Portability</h3>
                   <div className="bg-muted p-4 rounded-lg">
-                    <h3 className="text-lg font-medium text-foreground mb-2">Right to Data Portability</h3>
                     <p className="text-muted-foreground">
                       You have the right to receive your personal data in a structured, 
                       commonly used format and transfer it to another controller.
                     </p>
                   </div>
+                                      <h3 className="text-lg font-medium text-foreground mb-2">Right to Object</h3>
                   <div className="bg-muted p-4 rounded-lg">
-                    <h3 className="text-lg font-medium text-foreground mb-2">Right to Object</h3>
                     <p className="text-muted-foreground">
                       You can object to the processing of your personal data for direct marketing 
                       purposes or based on legitimate interests.
@@ -149,8 +149,8 @@ const GDPR = () => {
                   To exercise any of your GDPR rights, please contact us using the information below. 
                   We will respond to your request within one month, or inform you if we need additional time.
                 </p>
+                                  <p className="text-foreground font-medium mb-2">Data Protection Officer</p>
                 <div className="bg-muted p-4 rounded-lg">
-                  <p className="text-foreground font-medium mb-2">Data Protection Officer</p>
                   <p className="text-muted-foreground">Email: dpo@ai-consultant-widget.com</p>
                   <p className="text-muted-foreground">Address: [Your Company Address]</p>
                 </div>
