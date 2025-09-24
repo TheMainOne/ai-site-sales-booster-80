@@ -10,9 +10,11 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+ base: mode === "production" ? "/ai-site-sales-booster-80/" : "/",
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
 }));
+
