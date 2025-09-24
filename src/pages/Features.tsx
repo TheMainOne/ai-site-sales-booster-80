@@ -12,10 +12,10 @@ const FeaturesPage = () => {
           <Link to="/">
             <Button variant="ghost" className="flex items-center gap-2">
               <ArrowLeft size={16} />
-              Назад на главную
+              Back to home
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold text-foreground">Возможности</h1>
+          <h1 className="text-2xl font-bold text-foreground">Opportunities</h1>
         </div>
       </header>
       <Features />
