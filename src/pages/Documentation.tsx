@@ -2,17 +2,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Book, Code, Zap, Shield, Users, Rocket } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 
 export default function Documentation() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
       <div className="container mx-auto px-4 py-16">
+            {/* Back to home */}
+    <div className="mb-6">
+      <Link to="/">
+        <Button variant="ghost" className="flex items-center gap-2">
+          <ArrowLeft size={16}  />
+          Back to home
+        </Button>
+      </Link>
+    </div>
         {/* Header */}
         <div className="text-center mb-16">
-          <Badge variant="outline" className="mb-4">
-            <Book className="w-4 h-4 mr-2" />
-            Documentation
-          </Badge>
           <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
             Developer Documentation
           </h1>
@@ -37,7 +45,7 @@ export default function Documentation() {
               </CardHeader>
               <CardContent>
                 <div className="bg-muted rounded-lg p-4">
-                  <code className="text-sm">
+                  <code className="text-sm text-white">
                     &lt;script src="https://ai-widget.com/embed.js"&gt;&lt;/script&gt;
                   </code>
                 </div>
@@ -56,7 +64,7 @@ export default function Documentation() {
               </CardHeader>
               <CardContent>
                 <div className="bg-muted rounded-lg p-4">
-                  <code className="text-sm">
+                  <code className="text-sm text-white">
                     AIWidget.init(&#123;<br />
                     &nbsp;&nbsp;apiKey: 'your-api-key',<br />
                     &nbsp;&nbsp;theme: 'light'<br />
@@ -78,7 +86,7 @@ export default function Documentation() {
               </CardHeader>
               <CardContent>
                 <div className="bg-muted rounded-lg p-4">
-                  <code className="text-sm">
+                  <code className="text-sm text-white">
                     AIWidget.start();<br />
                     // Your site is now optimized!
                   </code>
@@ -108,7 +116,7 @@ export default function Documentation() {
                 <div>
                   <h4 className="font-semibold mb-2">API Key Authentication</h4>
                   <div className="bg-muted rounded-lg p-3">
-                    <code className="text-sm">
+                    <code className="text-sm text-white">
                       Authorization: Bearer your-api-key
                     </code>
                   </div>
@@ -136,7 +144,7 @@ export default function Documentation() {
                 <div>
                   <h4 className="font-semibold mb-2">Track Events</h4>
                   <div className="bg-muted rounded-lg p-3">
-                    <code className="text-sm">
+                    <code className="text-sm text-white">
                       AIWidget.track('conversion', &#123;<br />
                       &nbsp;&nbsp;value: 99.99,<br />
                       &nbsp;&nbsp;currency: 'USD'<br />
@@ -164,7 +172,7 @@ export default function Documentation() {
               </CardHeader>
               <CardContent>
                 <div className="bg-muted rounded-lg p-4">
-                  <code className="text-sm">
+                  <code className="text-sm text-white">
                     AIWidget.on('optimizationComplete', function(data) &#123;<br />
                     &nbsp;&nbsp;console.log('Optimization applied:', data.changes);<br />
                     &nbsp;&nbsp;// Custom logic here<br />
@@ -190,7 +198,7 @@ export default function Documentation() {
               </CardHeader>
               <CardContent>
                 <div className="bg-muted rounded-lg p-4">
-                  <code className="text-sm">
+                  <code className="text-sm text-white">
                     // Configure A/B test variants<br />
                     AIWidget.configure(&#123;<br />
                     &nbsp;&nbsp;abTesting: &#123;<br />
