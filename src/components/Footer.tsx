@@ -63,7 +63,7 @@ const Footer = () => {
 
         <div className="border-t border-cream/20 mt-12 pt-8 text-center">
           <p className="text-cream/60">
-            © 2024 AI-Consultant Widget. All rights reserved.
+            © 2025 AI-Consultant Widget. All rights reserved.
           </p>
         </div>
       </div>
