@@ -20,60 +20,36 @@ const UserAvatar = () => (
 /** Универсальный помощник: умеет и обычный JSON, и поток (ReadableStream) */
 async function sendToBackend(
   messages: ChatMessage[],
-  onToken?: (chunk: string) => void,
-  signal?: AbortSignal
+  onToken?: (chunk: string) => void
 ): Promise<string> {
   const res = await fetch("https://cloudcompliance.duckdns.org/widget/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, stream: true }),
-    signal, 
+    // ВРЕМЕННО форсим JSON-режим (без стрима)
+    body: JSON.stringify({ messages, stream: false }),
   });
 
-  // 1) Явная проверка статуса
   if (!res.ok) {
-    let details = "";
-    try {
-      const err = await res.text();
-      details = err?.slice(0, 400);
-    } catch {}
-    throw new Error(`Backend error ${res.status}. ${details}`);
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Backend error ${res.status}. ${txt.slice(0, 300)}`);
   }
 
-  const contentType = res.headers.get("content-type") || "";
-
-  // 2) Если это не event-stream — считаем обычный JSON
-  if (!res.body || !contentType.includes("text/event-stream")) {
-    const data = await res.json().catch(() => ({} as any));
-    return data.reply ?? "";
+  const ct = res.headers.get("content-type") || "";
+  // если вдруг сервер вернул не JSON — возьмём сырой текст
+  if (!ct.includes("application/json")) {
+    const txt = await res.text().catch(() => "");
+    return txt || "";
   }
 
-  // 3) Читаем поток; поддержим как «сырые токены», так и SSE с "data:"
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let full = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const raw = decoder.decode(value, { stream: true });
-
-    // Если сервер шлёт настоящие SSE-сообщения
-    // формата "data: ...\n\n" — удалим префикс и пустые строки:
-const chunks = raw
-  .split("\n")
-  .map(line => (line.startsWith("data:") ? line.slice(5).trimStart() : line))
-  .map(line => line.trim())
-  .filter(line => line.length > 0 && line !== "[DONE]");
-
-    const text = chunks.join("\n");
-    if (!text) continue;
-
-    full += text;
-    onToken?.(text);
+  // надёжный парс JSON
+  const txt = await res.text();
+  try {
+const data = (() => { try { return JSON.parse(txt) } catch { return null }})();
+return data?.reply ?? txt ?? "";
+  } catch {
+    // бывает, что прокси подрезал/переписал заголовок — подстрахуемся
+    return txt ?? "";
   }
-  return full;
 }
 
 
@@ -128,7 +104,6 @@ const send = useCallback(
 const doSend = sendToBackend(
   localMessages,
   (chunk) => { /* как у тебя */ },
-  abortRef.current?.signal // <= пробрасываем
 );
 
       // поддержка отмены (если бэк и fetch умеют)
