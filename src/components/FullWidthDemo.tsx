@@ -4,6 +4,8 @@ type Role = "user" | "assistant" | "system";
 type ChatMessage = { role: Role; content: string };
 
 const STARTERS = ["Price for 10 users", "Product bundle", "Book a demo"];
+const STORAGE_KEY = "aiw.messages.v1";
+const SESSION_KEY = "aiw.sessionId.v1";
 
 const AIAvatar = () => (
   <div className="w-8 h-8 bg-purple-accent rounded-full flex items-center justify-center flex-shrink-0">
@@ -54,17 +56,49 @@ return data?.reply ?? txt ?? "";
 
 
 function AIWidgetDemo() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "assistant",
-      content:
-        "Hi! I'm your AI sales consultant. I can help you with pricing, product bundles, demos, and answer any questions about our services. What would you like to know?",
-    },
-  ]);
+const [messages, setMessages] = useState<ChatMessage[]>(() => {
+  try {
+    if (typeof window === "undefined") throw new Error();
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) throw new Error();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error();
+    return parsed as ChatMessage[];
+    } catch {
+      return [{
+        role: "assistant",
+        content:
+         "Hi! I'm your AI sales consultant. I can help you with pricing, product bundles, demos, and answer any questions about our services. What would you like to know?",
+         }];
+        }
+        });
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId] = useState(() => {
+  try {
+    if (typeof window === "undefined") return "ssr";
+    const existing = localStorage.getItem(SESSION_KEY);
+    if (existing) return existing;
+    const id = (crypto as any)?.randomUUID?.() || String(Date.now());
+    localStorage.setItem(SESSION_KEY, id);
+    return id;
+  } catch {
+    return "local";
+  }
+});
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+  const t = setTimeout(() => {
+    try {
+      // ограничим хранения историю, чтобы не разрасталась (последние 200 сообщений)
+      const trimmed = messages.slice(-200);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    } catch {}
+  }, 150); // лёгкий дебаунс
+  return () => clearTimeout(t);
+}, [messages]);
+  
 
   const canSend = useMemo(() => input.trim().length > 0 && !isSending, [input, isSending]);
 
@@ -167,9 +201,23 @@ useEffect(() => {
               <p className="text-xs text-muted-foreground">{isSending ? "Typing…" : "Online now"}</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3 items-center">
             <div className={`w-3 h-3 ${isSending ? "bg-yellow-400" : "bg-green-500"} rounded-full`} />
             <span className="text-xs text-muted-foreground">Live Demo</span>
+            <button
+             type="button"
+             onClick={() => {
+              try { localStorage.removeItem(STORAGE_KEY); } catch {}
+              setMessages([{
+                role: "assistant",
+                content:
+                 "Hi! I'm your AI sales consultant. I can help you with pricing, product bundles, demos, and answer any questions about our services. What would you like to know?",
+                 }]);
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
+                  >
+                     Reset
+                  </button>
           </div>
         </div>
 
