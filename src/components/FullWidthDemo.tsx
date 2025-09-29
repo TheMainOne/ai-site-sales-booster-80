@@ -13,7 +13,7 @@ const AIAvatar = () => (
 
 const UserAvatar = () => (
   <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center flex-shrink-0">
-    <span className="text-gray-600 text-xs font-bold">U</span>
+    <span className="text-gray-600 text-xs font-bold">You</span>
   </div>
 );
 
