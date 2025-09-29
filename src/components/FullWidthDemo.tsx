@@ -23,7 +23,7 @@ async function sendToBackend(
   onToken?: (chunk: string) => void,
   signal?: AbortSignal
 ): Promise<string> {
-  const res = await fetch("/api/aiw/chat", {
+  const res = await fetch("https://cloudcompliance.duckdns.org/widget/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages, stream: true }),
