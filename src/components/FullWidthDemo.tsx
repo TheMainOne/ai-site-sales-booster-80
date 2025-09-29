@@ -189,7 +189,15 @@ useEffect(() => {
                 <div
                   className={`${isUser ? "bg-purple-accent text-white" : "bg-white text-foreground"} rounded-lg p-4 shadow-sm max-w-lg whitespace-pre-wrap`}
                 >
-                  <p>{m.content}</p>
+                  {(!isUser && m.content === "") ? (
+                     <span className="inline-flex items-center gap-1 text-muted-foreground">
+                       <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
+                       <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
+                        <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
+                                </span>
+                                 ) : (
+                                   <p>{m.content}</p>
+                                   )}
                 </div>
                 {isUser && <UserAvatar />}
               </div>
@@ -213,18 +221,6 @@ useEffect(() => {
           )}
 
           {/* typing indicator */}
-          {isSending && (
-            <div className="flex gap-3">
-              <AIAvatar />
-              <div className="bg-white rounded-lg p-4 shadow-sm max-w-md">
-                <span className="inline-flex items-center gap-1 text-muted-foreground">
-                  <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
-                  <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
-                  <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
-                </span>
-              </div>
-            </div>
-          )}
 
           {error && (
             <div className="ml-11 text-sm text-red-600">{error}</div>
