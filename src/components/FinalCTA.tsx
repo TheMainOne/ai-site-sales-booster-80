@@ -29,7 +29,7 @@ const FinalCTA = () => {
     s.setAttribute("data-src", `https://cloudcompliance.duckdns.org/aiw/widget.js?v=${v}`);
     s.setAttribute("data-endpoint", "https://cloudcompliance.duckdns.org/api/aiw/chat");
     s.setAttribute("data-site-id", "SITE_123");
-    s.setAttribute("data-title", "Sales Assistant");
+    s.setAttribute("data-title", "AI-Consultant Widget");
     s.setAttribute("data-accent", "#6D28D9");
     s.setAttribute("data-position", "br");
     s.setAttribute("data-lang", "en");
