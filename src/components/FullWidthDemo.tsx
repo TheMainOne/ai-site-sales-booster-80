@@ -24,9 +24,12 @@ async function sendToBackend(
   messages: ChatMessage[],
   onToken?: (chunk: string) => void
 ): Promise<string> {
-  const res = await fetch("https://cloudcompliance.duckdns.org/widget/chat", {
+const res = await fetch("https://cloudcompliance.duckdns.org/api/aiw/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+       "x-aiw-site": "SITE_123",
+        },
     // ВРЕМЕННО форсим JSON-режим (без стрима)
     body: JSON.stringify({ messages, stream: false }),
   });
