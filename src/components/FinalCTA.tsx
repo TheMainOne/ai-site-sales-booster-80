@@ -17,16 +17,15 @@ const FinalCTA = () => {
     };
 
     // 2) cache-busting, иначе тянется старая версия (Cache-Control: immutable)
-    const v = "2025-10-13-6"; // меняй при каждом деплое
 
     const s = document.createElement("script");
-    s.src = `https://cloudcompliance.duckdns.org/aiw/widget-loader.js?v=${v}`;
+    s.src = `https://cloudcompliance.duckdns.org/aiw/widget-loader.js`;
     s.defer = true;
     s.crossOrigin = "anonymous";
     s.setAttribute("data-aiw-loader", "1");
 
     // 3) продублируем конфиг через data-* (не обязательно, но полезно)
-    s.setAttribute("data-src", `https://cloudcompliance.duckdns.org/aiw/widget.js?v=${v}`);
+    s.setAttribute("data-src", `https://cloudcompliance.duckdns.org/aiw/widget.js`);
     s.setAttribute("data-endpoint", "https://cloudcompliance.duckdns.org/api/aiw/chat");
     s.setAttribute("data-site-id", "SITE_123");
     s.setAttribute("data-title", "AI-Consultant Widget");
