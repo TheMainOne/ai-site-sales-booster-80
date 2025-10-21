@@ -1,5 +1,71 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+
+/** Обёртка вокруг fetch: логирует запрос/ответ и читает debug-заголовки с сервера */
+async function askAIW(
+  endpoint: string,
+  payload: any,
+  {
+    siteId,
+    sessionId,
+    debug = true,
+    signal,
+  }: { siteId: string; sessionId: string; debug?: boolean; signal?: AbortSignal }
+) {
+  const t0 = performance.now();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-AIW-Site": siteId,
+    "X-AIW-Session": sessionId,
+  };
+  if (debug) headers["X-AIW-Debug"] = "1";
+
+  console.groupCollapsed("%cAIW → request", "color:#6D28D9;font-weight:bold");
+  console.log("URL:", endpoint);
+  console.log("Headers:", headers);
+  console.log("Body:", payload);
+  console.groupEnd();
+
+  const res = await fetch(endpoint + (debug ? "?debug=1" : ""), {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  const rawText = await res.clone().text();
+  let json: any = null;
+  try { json = JSON.parse(rawText); } catch { /* оставим как текст */ }
+
+  const exposed = (k: string) => res.headers.get(k);
+  const dbg = {
+    status: res.status,
+    build: exposed("X-AIW-Build"),
+    source: exposed("X-AIW-Source"),
+    citationsCount: exposed("X-AIW-Citations-Count"),
+    handler: exposed("X-AIW-Handler"),
+    route: exposed("X-AIW-Route"),
+    site: exposed("X-AIW-Resolved-Site"),
+    session: exposed("X-AIW-Resolved-Session"),
+    phase: exposed("X-AIW-Phase"),
+    db: exposed("X-AIW-DB"),
+    timing: (() => { try { return JSON.parse(exposed("X-AIW-Timing") || "{}"); } catch { return {}; } })(),
+    rttMs: Math.round(performance.now() - t0),
+  };
+
+  console.groupCollapsed("%cAIW ← response", "color:#16A34A;font-weight:bold");
+  console.log("Server debug:", dbg);
+  console.log("JSON:", json ?? rawText);
+  console.groupEnd();
+
+  if (!res.ok) {
+    throw new Error(`Backend ${res.status}. ${rawText.slice(0, 300)}`);
+  }
+
+  return { json, rawText, debugHeaders: dbg };
+}
+
+
 type Role = "user" | "assistant" | "system";
 type ChatMessage = { role: Role; content: string };
 
@@ -20,42 +86,32 @@ const UserAvatar = () => (
 );
 
 /** Универсальный помощник: умеет и обычный JSON, и поток (ReadableStream) */
+/** Универсальный помощник: JSON сейчас; позже можно включить stream через onToken */
 async function sendToBackend(
   messages: ChatMessage[],
-  onToken?: (chunk: string) => void
+  onToken?: (chunk: string) => void,
+  opts?: { siteId?: string; sessionId?: string; signal?: AbortSignal }
 ): Promise<string> {
-const res = await fetch("https://cloudcompliance.duckdns.org/api/aiw/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-       "x-aiw-site": "SITE_123",
-        },
-    // ВРЕМЕННО форсим JSON-режим (без стрима)
-    body: JSON.stringify({ messages, stream: false }),
+  const ENDPOINT = "https://cloudcompliance.duckdns.org/api/aiw/chat";
+  const siteId = opts?.siteId ?? "SITE_123";
+  const sessionId = opts?.sessionId ?? "sess-local";
+
+  // важно: сервер ждёт messages[], а не message
+  const payload = { messages, stream: false, meta: { siteId, sessionId, lang: "en" } };
+
+  const { json, rawText } = await askAIW(ENDPOINT, payload, {
+    siteId,
+    sessionId,
+    signal: opts?.signal,
   });
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`Backend error ${res.status}. ${txt.slice(0, 300)}`);
+  // сервер всегда отдаёт { reply, source, citations }, но подстрахуемся
+  if (json && typeof json === "object" && "reply" in json) {
+    return String(json.reply ?? "");
   }
-
-  const ct = res.headers.get("content-type") || "";
-  // если вдруг сервер вернул не JSON — возьмём сырой текст
-  if (!ct.includes("application/json")) {
-    const txt = await res.text().catch(() => "");
-    return txt || "";
-  }
-
-  // надёжный парс JSON
-  const txt = await res.text();
-  try {
-const data = (() => { try { return JSON.parse(txt) } catch { return null }})();
-return data?.reply ?? txt ?? "";
-  } catch {
-    // бывает, что прокси подрезал/переписал заголовок — подстрахуемся
-    return txt ?? "";
-  }
+  return rawText || "";
 }
+
 
 
 function AIWidgetDemo() {
@@ -141,6 +197,7 @@ const send = useCallback(
 const doSend = sendToBackend(
   localMessages,
   (chunk) => { /* как у тебя */ },
+    { siteId: "SITE_123", sessionId, signal: abortRef.current?.signal }
 );
 
       // поддержка отмены (если бэк и fetch умеют)
