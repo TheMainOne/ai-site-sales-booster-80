@@ -8,6 +8,20 @@ const Hero = () => {
 
   return (
     <section className="relative bg-gradient-to-br from-cream to-background py-24 px-6 overflow-hidden">
+           {/* Top-right auth button */}
+      <div className="absolute right-6 top-6 z-20">
+        <Button
+          asChild
+          variant="outline"
+          size="sm"
+          className="rounded-full border-2 border-graphite text-graphite hover:bg-graphite hover:text-cream px-5"
+          title="Sign in / Sign up"
+        >
+          <a href="/auth">Sign in/Sign up</a>
+        </Button>
+      </div>
+
+
       {/* Background decoration */}
       <div className="absolute inset-0 bg-gradient-to-r from-purple-accent/5 to-transparent" />
       
