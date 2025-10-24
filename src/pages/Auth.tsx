@@ -1,6 +1,6 @@
 // src/pages/Auth.tsx
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,15 +93,12 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4 relative">
       {/* Back */}
       <div className="absolute left-6 top-6 z-20">
-        <Button
-          asChild
-          variant="outline"
-          size="sm"
-          className="rounded-full border-2 border-graphite text-graphite hover:bg-graphite hover:text-cream px-5"
-          title="Back"
-        >
-          <a href="/">Back</a>
-        </Button>
+                          <Link
+                  to="/"
+                  className="text-black/80 hover:text-white transition-colors"
+                >
+                  Back to Home
+                </Link>
       </div>
 
       <Card className="w-full max-w-md">
