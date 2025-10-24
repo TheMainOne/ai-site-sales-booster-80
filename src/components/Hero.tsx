@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-ai-widget.jpg";
 
 const Hero = () => {
@@ -17,7 +18,12 @@ const Hero = () => {
           className="rounded-full border-2 border-graphite text-graphite hover:bg-graphite hover:text-cream px-5"
           title="Sign in / Sign up"
         >
-          <a href="/auth">Sign in/Sign up</a>
+                          <Link
+                  to="/auth"
+                  className="text-cream/80 hover:text-white transition-colors"
+                >
+                  Sign in/Sign up
+                </Link>
         </Button>
       </div>
 
