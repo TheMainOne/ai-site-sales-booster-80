@@ -5,27 +5,36 @@ const FinalCTA = () => {
   useEffect(() => {
     if (document.querySelector('script[data-aiw-loader="1"]')) return;
 
-    // 1) задаём конфиг заранее (переиграет любые дефолты в лоадере)
+    // 1) глобальный конфиг (перебьёт дефолты лоадера)
     (window as any).__AIW_CONFIG__ = {
-      endpoint: "https://cloudcompliance.duckdns.org/api/aiw/chat", // <-- нужный путь
+      endpoint: "https://cloudcompliance.duckdns.org/api/aiw/chat",
       siteId: "SITE_123",
       title: "Sales Assistant",
       position: "br",
       accent: "#6D28D9",
       welcome: "Hi! Ask about pricing, bundles, or demos.",
       lang: "en",
+
+      // NEW: автоприветствие
+      autostart: true,                    // включить
+      autostartDelay: 5000,               // мс
+      autostartMode: "ai",                // "local" | "ai"
+      autostartMessage: "Hi there! Need help choosing a plan?",
+      autostartPrompt:
+        "Write a short warm greeting in one sentence and suggest 3 quick questions about pricing, bundles, demos.",
+      autostartCooldownHours: 12          // не чаще 1 раза в 12 ч
     };
 
-    // 2) cache-busting, иначе тянется старая версия (Cache-Control: immutable)
-
+    // 2) загрузчик (с cache-busting, чтобы стянулся новый код)
+    const ver = Date.now(); // простой cache-bust
     const s = document.createElement("script");
-    s.src = `https://cloudcompliance.duckdns.org/aiw/widget-loader.js`;
+    s.src = `https://cloudcompliance.duckdns.org/aiw/widget-loader.js?v=${ver}`;
     s.defer = true;
     s.crossOrigin = "anonymous";
     s.setAttribute("data-aiw-loader", "1");
 
-    // 3) продублируем конфиг через data-* (не обязательно, но полезно)
-    s.setAttribute("data-src", `https://cloudcompliance.duckdns.org/aiw/widget.js`);
+    // 3) продублируем конфиг через data-* (на случай, если загрузчик не читает window.__AIW_CONFIG__)
+    s.setAttribute("data-src", `https://cloudcompliance.duckdns.org/aiw/widget.js?v=${ver}`);
     s.setAttribute("data-endpoint", "https://cloudcompliance.duckdns.org/api/aiw/chat");
     s.setAttribute("data-site-id", "SITE_123");
     s.setAttribute("data-title", "AI-Consultant Widget");
@@ -34,9 +43,19 @@ const FinalCTA = () => {
     s.setAttribute("data-lang", "en");
     s.setAttribute("data-welcome", "Hi! Ask about pricing, bundles, or demos.");
 
+    // NEW: атрибуты для автозапуска (должны читаться твоим обновлённым loader’ом)
+    s.setAttribute("data-autostart", "true");
+    s.setAttribute("data-autostart-delay", "5000");
+    s.setAttribute("data-autostart-mode", "ai"); // "local" | "ai"
+    s.setAttribute("data-autostart-message", "Hi there! Need help choosing a plan?");
+    s.setAttribute(
+      "data-autostart-prompt",
+      "Write a short warm greeting in one sentence and suggest 3 quick questions about pricing, bundles, demos."
+    );
+    s.setAttribute("data-autostart-cooldown-hours", "12");
+
     document.body.appendChild(s);
 
-    // (опционально) лог для себя — убедиться, что конфиг тот
     (s.onload = () => {
       // @ts-ignore
       console.log("[AIW] loader ready, cfg=", (window as any).__AIW_CONFIG__);
@@ -46,7 +65,6 @@ const FinalCTA = () => {
   return (
     <section className="py-24 px-6 bg-gradient-to-r from-purple-accent to-accent">
       <div className="container mx-auto max-w-4xl text-center">
-        {/* ... твоя разметка без изменений ... */}
         <div className="space-y-8">
           <h2 className="text-4xl lg:text-5xl font-bold text-white leading-tight">
             Ready to add an AI Sales Consultant to your site?
@@ -54,7 +72,6 @@ const FinalCTA = () => {
           <p className="text-xl lg:text-2xl text-white/90 leading-relaxed">
             Join hundreds of businesses already converting more visitors into customers
           </p>
-
           <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
             <Button
               size="lg"
