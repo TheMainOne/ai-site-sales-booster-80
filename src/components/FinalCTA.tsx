@@ -18,8 +18,8 @@ const FinalCTA = () => {
       // NEW: автоприветствие
       autostart: true,                    // включить
       autostartDelay: 5000,               // мс
-      autostartMode: "ai",                // "local" | "ai"
-      autostartMessage: "Hi there! Need help choosing a plan?",
+      autostartMode: "local",                // "local" | "ai"
+      autostartMessage: "Hi there! Need help choosing a plan? I can assist you.", // только для "local"
       autostartPrompt:
         "Write a short warm greeting in one sentence and suggest 3 quick questions about pricing, bundles, demos.",
       autostartCooldownHours: 12          // не чаще 1 раза в 12 ч
@@ -46,8 +46,8 @@ const FinalCTA = () => {
     // NEW: атрибуты для автозапуска (должны читаться твоим обновлённым loader’ом)
     s.setAttribute("data-autostart", "true");
     s.setAttribute("data-autostart-delay", "5000");
-    s.setAttribute("data-autostart-mode", "ai"); // "local" | "ai"
-    s.setAttribute("data-autostart-message", "Hi there! Need help choosing a plan?");
+    s.setAttribute("data-autostart-mode", "local"); // "local" | "ai"
+    s.setAttribute("data-autostart-message", "Hi there! Need help choosing a plan? I can assist you.");
     s.setAttribute(
       "data-autostart-prompt",
       "Write a short warm greeting in one sentence and suggest 3 quick questions about pricing, bundles, demos."
