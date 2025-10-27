@@ -17,7 +17,7 @@ const FinalCTA = () => {
 
       // NEW: автоприветствие
       autostart: true,                    // включить
-      autostartDelay: 500,               // мс
+      autostartDelay: 5000,               // мс
       autostartMode: "local",                // "local" | "ai"
       autostartMessage: "Hi there! Need help choosing a plan? I can assist you.", // только для "local"
       autostartPrompt:
@@ -47,7 +47,7 @@ const FinalCTA = () => {
 
     // NEW: атрибуты для автозапуска (должны читаться твоим обновлённым loader’ом)
     s.setAttribute("data-autostart", "true");
-    s.setAttribute("data-autostart-delay", "500");
+    s.setAttribute("data-autostart-delay", "5000");
     s.setAttribute("data-autostart-mode", "local"); // "local" | "ai"
     s.setAttribute("data-autostart-message", "Hi there! Need help choosing a plan? I can assist you.");
     s.setAttribute(
