@@ -22,7 +22,7 @@ const FinalCTA = () => {
       autostartMessage: "Hi there! Need help choosing a plan? I can assist you.", // только для "local"
       autostartPrompt:
         "Write a short warm greeting in one sentence and suggest 3 quick questions about pricing, bundles, demos.",
-      autostartCooldownHours: 12          // не чаще 1 раза в 12 ч
+      autostartCooldownHours: 0.017          // не чаще 1 раза в 12 ч
     };
 
     // 2) загрузчик (с cache-busting, чтобы стянулся новый код)
