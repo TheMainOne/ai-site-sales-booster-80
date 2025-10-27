@@ -52,7 +52,7 @@ const FinalCTA = () => {
       "data-autostart-prompt",
       "Write a short warm greeting in one sentence and suggest 3 quick questions about pricing, bundles, demos."
     );
-    s.setAttribute("data-autostart-cooldown-hours", "12");
+    s.setAttribute("data-autostart-cooldown-hours", "0.017");
 
     document.body.appendChild(s);
 
