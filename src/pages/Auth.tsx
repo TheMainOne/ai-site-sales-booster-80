@@ -7,7 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "https://cloudcompliance.duckdns.org";
+
+const API_BASE = import.meta.env.VITE_API_BASE || "https://cloudcompliance.duckdns.org/api/aiw";
+
 
 type ApiLoginResp = {
   user: { id: string; email: string; name?: string; roles: string[] };
@@ -38,7 +40,7 @@ export default function Auth() {
     if (!siEmail || !siPassword) return setSiError("Введите email и пароль.");
     setSiLoading(true);
     try {
-      const r = await fetch(`${API_BASE}/api/auth/login`, {
+      const r = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: siEmail.trim(), password: siPassword }),
@@ -67,7 +69,7 @@ export default function Auth() {
     if (suPassword.length < 6) return setSuError("Пароль должен быть не короче 6 символов.");
     setSuLoading(true);
     try {
-      const r = await fetch(`${API_BASE}/api/auth/register`, {
+      const r = await fetch(`${API_BASE}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: suEmail.trim(), password: suPassword, name: suName.trim() || undefined }),
