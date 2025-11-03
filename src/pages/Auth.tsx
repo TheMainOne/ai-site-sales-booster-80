@@ -54,7 +54,7 @@ export default function Auth() {
       localStorage.setItem("refreshToken", resp.tokens.refreshToken);
       localStorage.setItem("currentUser", JSON.stringify(resp.user));
 
-      navigate("/dashboard");
+      navigate("/"); // редирект домой/в консоль
     } catch (err: any) {
       setSiError(err.message || "Не удалось войти.");
     } finally {
@@ -83,7 +83,7 @@ export default function Auth() {
       localStorage.setItem("refreshToken", resp.tokens.refreshToken);
       localStorage.setItem("currentUser", JSON.stringify(resp.user));
 
-      navigate("/dashboard");
+      navigate("/"); // после регистрации сразу внутри
     } catch (err: any) {
       setSuError(err.message || "Не удалось зарегистрироваться.");
     } finally {
