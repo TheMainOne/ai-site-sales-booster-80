@@ -1,236 +1,220 @@
 // src/pages/Auth.tsx
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/hooks/use-toast";
 
-
+// Если твои auth-роуты под /api/auth — оставь так; если под /api/aiw/auth — поменяй BASE
 const API_BASE = import.meta.env.VITE_API_BASE || "https://cloudcompliance.duckdns.org/api/aiw";
 
-
-type ApiLoginResp = {
-  user: { id: string; email: string; name?: string; roles: string[] };
-  tokens: { accessToken: string; refreshToken: string };
+type BackendUser = {
+  id?: string;
+  _id?: string;
+  email: string;
+  name?: string;
+  roles?: string[];
+  sites?: string[];
+  isActive?: boolean;
 };
 
-export default function Auth() {
+type LoginResponse = {
+  user?: BackendUser;
+  tokens?: { accessToken?: string; refreshToken?: string };
+  accessToken?: string;
+  refreshToken?: string;
+  token?: string;
+  message?: string;
+  error?: string;
+};
+
+// ---------- Token helpers ----------
+function setAuthTokens(accessToken?: string, refreshToken?: string) {
+  if (accessToken) localStorage.setItem("auth_access", accessToken);
+  if (refreshToken) localStorage.setItem("auth_refresh", refreshToken);
+}
+
+const Auth = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Sign in
-  const [siEmail, setSiEmail] = useState("");
-  const [siPassword, setSiPassword] = useState("");
-  const [siShowPass, setSiShowPass] = useState(false);
-  const [siLoading, setSiLoading] = useState(false);
-  const [siError, setSiError] = useState<string | null>(null);
+  // ---- Возврат из Google: токены в URL → сохраняем и сразу уходим на /dashboard
+  useEffect(() => {
+    if (location.pathname !== "/auth") return;
 
-  // Sign up
-  const [suName, setSuName] = useState("");
-  const [suEmail, setSuEmail] = useState("");
-  const [suPassword, setSuPassword] = useState("");
-  const [suShowPass, setSuShowPass] = useState(false);
-  const [suLoading, setSuLoading] = useState(false);
-  const [suError, setSuError] = useState<string | null>(null);
+    const params = new URLSearchParams(location.search);
+    const accessFromUrl = params.get("accessToken") || params.get("token");
+    const refreshFromUrl = params.get("refreshToken") || undefined;
 
-  async function handleSignIn(e: React.FormEvent) {
+    if (accessFromUrl) {
+      setAuthTokens(accessFromUrl, refreshFromUrl || undefined);
+      // чистим query, чтобы токены не торчали в адресе
+      window.history.replaceState({}, "", location.pathname);
+      navigate("/dashboard", { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- Логин/Регистрация: при успехе → сразу /dashboard
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSiError(null);
-    if (!siEmail || !siPassword) return setSiError("Введите email и пароль.");
-    setSiLoading(true);
+    setLoading(true);
+
     try {
-      const r = await fetch(`${API_BASE}/auth/login`, {
+      const url = isSignUp ? `${API_BASE}/auth/register` : `${API_BASE}/auth/login`;
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: siEmail.trim(), password: siPassword }),
+        body: JSON.stringify({ email, password }),
       });
-      const data = (await r.json()) as ApiLoginResp | { error?: string; details?: string[] };
 
-      if (!r.ok) throw new Error(("error" in data && data.error) || "Login failed");
+      const data: LoginResponse = await res.json();
+      if (!res.ok) throw new Error(data?.error || data?.message || "Auth failed");
 
-      const resp = data as ApiLoginResp;
-      localStorage.setItem("accessToken", resp.tokens.accessToken);
-      localStorage.setItem("refreshToken", resp.tokens.refreshToken);
-      localStorage.setItem("currentUser", JSON.stringify(resp.user));
+      const accessToken =
+        data?.token ||
+        data?.accessToken ||
+        data?.tokens?.accessToken ||
+        null;
 
-      navigate("/dashboard");
-    } catch (err: any) {
-      setSiError(err.message || "Не удалось войти.");
-    } finally {
-      setSiLoading(false);
-    }
-  }
+      const refreshToken =
+        data?.refreshToken ||
+        data?.tokens?.refreshToken ||
+        null;
 
-  async function handleSignUp(e: React.FormEvent) {
-    e.preventDefault();
-    setSuError(null);
-    if (!suEmail || !suPassword) return setSuError("Email и пароль обязательны.");
-    if (suPassword.length < 6) return setSuError("Пароль должен быть не короче 6 символов.");
-    setSuLoading(true);
-    try {
-      const r = await fetch(`${API_BASE}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: suEmail.trim(), password: suPassword, name: suName.trim() || undefined }),
+      if (accessToken) setAuthTokens(accessToken, refreshToken || undefined);
+
+      toast({
+        title: isSignUp ? "Registration successful" : "Logged in",
+        description: isSignUp ? "You can now sign in." : "Welcome!",
       });
-      const data = (await r.json()) as ApiLoginResp | { error?: string; details?: string[] };
 
-      if (!r.ok) throw new Error(("error" in data && data.error) || "Registration failed");
-
-      const resp = data as ApiLoginResp;
-      localStorage.setItem("accessToken", resp.tokens.accessToken);
-      localStorage.setItem("refreshToken", resp.tokens.refreshToken);
-      localStorage.setItem("currentUser", JSON.stringify(resp.user));
-
-      navigate("/dashboard");
-    } catch (err: any) {
-      setSuError(err.message || "Не удалось зарегистрироваться.");
+      // 👉 ключевая строка: сразу уходим на dashboard
+      navigate("/dashboard", { replace: true });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Authentication error",
+        variant: "destructive",
+      });
     } finally {
-      setSuLoading(false);
+      setLoading(false);
     }
-  }
+  };
+
+  // ---- Google OAuth ----
+  const handleGoogleAuth = () => {
+    setLoading(true);
+    const redirectUri = `${window.location.origin}/auth`;
+    window.location.href = `${API_BASE}/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`;
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4 relative">
-      {/* Back */}
-      <div className="absolute left-6 top-6 z-20">
-                          <Link
-                  to="/"
-                  className="text-black/80 hover:text-white transition-colors"
-                >
-                  Back to Home
-                </Link>
-      </div>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+      {/* ← Back to Home */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="absolute left-4 top-4"
+        onClick={() => navigate("/")}
+        aria-label="Back to home"
+      >
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back
+      </Button>
 
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold">Добро пожаловать</CardTitle>
-          <CardDescription>Войдите в систему или создайте новый аккаунт</CardDescription>
+        <CardHeader>
+          <CardTitle className="text-2xl text-center">
+            {isSignUp ? "Sign Up" : "Login"}
+          </CardTitle>
+          <CardDescription className="text-center">
+            {isSignUp ? "Create your account to get started" : "Log in to your dashboard"}
+          </CardDescription>
         </CardHeader>
 
-        <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Вход</TabsTrigger>
-              <TabsTrigger value="signup">Регистрация</TabsTrigger>
-            </TabsList>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
 
-            {/* Sign In */}
-            <TabsContent value="signin">
-              <form className="space-y-4" onSubmit={handleSignIn}>
-                <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email</Label>
-                  <Input
-                    id="signin-email"
-                    type="email"
-                    placeholder="you@email.com"
-                    value={siEmail}
-                    onChange={(e) => setSiEmail(e.target.value)}
-                    required
-                    autoComplete="email"
-                  />
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                autoComplete={isSignUp ? "new-password" : "current-password"}
+              />
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password">Пароль</Label>
-                  <div className="relative">
-                    <Input
-                      id="signin-password"
-                      type={siShowPass ? "text" : "password"}
-                      value={siPassword}
-                      onChange={(e) => setSiPassword(e.target.value)}
-                      required
-                      autoComplete="current-password"
-                      className="pr-24"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 text-sm"
-                      onClick={() => setSiShowPass((v) => !v)}
-                    >
-                      {siShowPass ? "Скрыть" : "Показать"}
-                    </Button>
-                  </div>
-                </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Loading..." : isSignUp ? "Sign Up" : "Login"}
+            </Button>
+          </form>
 
-                {siError && <p className="text-sm text-red-600">{siError}</p>}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
 
-                <Button type="submit" className="w-full" disabled={siLoading}>
-                  {siLoading ? "Входим…" : "Войти"}
-                </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handleGoogleAuth}
+            disabled={loading}
+          >
+            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Sign in with Google
+          </Button>
 
-                <div className="text-right">
-                  <a className="text-sm text-muted-foreground hover:underline" href="#">
-                    Забыли пароль?
-                  </a>
-                </div>
-              </form>
-            </TabsContent>
-
-            {/* Sign Up */}
-            <TabsContent value="signup">
-              <form className="space-y-4" onSubmit={handleSignUp}>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-name">Имя (необязательно)</Label>
-                  <Input
-                    id="signup-name"
-                    type="text"
-                    placeholder="Max"
-                    value={suName}
-                    onChange={(e) => setSuName(e.target.value)}
-                    autoComplete="name"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="you@email.com"
-                    value={suEmail}
-                    onChange={(e) => setSuEmail(e.target.value)}
-                    required
-                    autoComplete="email"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Пароль</Label>
-                  <div className="relative">
-                    <Input
-                      id="signup-password"
-                      type={suShowPass ? "text" : "password"}
-                      value={suPassword}
-                      onChange={(e) => setSuPassword(e.target.value)}
-                      required
-                      minLength={6}
-                      autoComplete="new-password"
-                      className="pr-24"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 text-sm"
-                      onClick={() => setSuShowPass((v) => !v)}
-                    >
-                      {suShowPass ? "Скрыть" : "Показать"}
-                    </Button>
-                  </div>
-                </div>
-
-                {suError && <p className="text-sm text-red-600">{suError}</p>}
-
-                <Button type="submit" className="w-full" disabled={suLoading}>
-                  {suLoading ? "Создаём…" : "Зарегистрироваться"}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <div className="text-center text-sm">
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-primary hover:underline"
+              disabled={loading}
+            >
+              {isSignUp ? "Already have an account? Login" : "No account? Sign Up"}
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>
   );
-}
+};
+
+export default Auth;
