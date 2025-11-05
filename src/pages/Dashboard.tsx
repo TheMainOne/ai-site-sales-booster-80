@@ -15,6 +15,8 @@ import {
   User as UserIcon,
 } from "lucide-react";
 
+const PUBLIC_API_ROOT = "https://cloudcompliance.duckdns.org/api";
+
 // === Types ===
 interface Client {
   id: string;
@@ -22,8 +24,16 @@ interface Client {
   slug: string;
   is_active?: boolean;
   created_at: string;
-  // опционально, если бэк вернёт siteId — используем в fallback-фильтрации
   siteId?: string;
+}
+
+interface Me {
+  id?: string;     // JWT-based
+  _id?: string;    // Mongo _id
+  email: string;
+  name?: string;
+  roles?: string[];
+  sites?: string[]; // список доступных сайтов/тенантов
 }
 
 interface Stats {
@@ -31,15 +41,6 @@ interface Stats {
   totalDocuments: number;
   totalUsers: number;
   activeSessions: number;
-}
-
-interface Me {
-  id?: string;      // JWT-based
-  _id?: string;     // Mongo _id
-  email: string;
-  name?: string;
-  roles?: string[];
-  sites?: string[]; // ВАЖНО: список доступных сайтов/тенантов
 }
 
 // !!! ДОЛЖЕН совпадать с Auth.tsx !!!
@@ -106,6 +107,20 @@ async function fetchWithAuth(path: string, init: RequestInit = {}) {
   return res;
 }
 
+// === Normalization helpers ===
+type RawClient = any;
+
+function normalizeClients(raw: RawClient[]): Client[] {
+  return (raw || []).map((c: any) => ({
+    id: c.id || c._id || c.slug,
+    name: c.name,
+    slug: c.slug,
+    is_active: typeof c.is_active === "boolean" ? c.is_active : c.isActive,
+    created_at: c.created_at || c.createdAt || new Date().toISOString(),
+    siteId: c.siteId,
+  }));
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -119,75 +134,46 @@ export default function Dashboard() {
     activeSessions: 0,
   });
   const [busy, setBusy] = useState<{ stats?: boolean; clients?: boolean }>({});
+  const [superadminTotalClients, setSuperadminTotalClients] = useState<number | null>(null);
+  const isSuperadmin = !!(user?.roles && user.roles.includes("superadmin"));
 
-  // === Initial auth check and data load ===
-  useEffect(() => {
-    let isMounted = true;
+  // вынесенные лоадеры (проще читать и меньше шансов перепутать скобки)
+const loadClients = async (sites: string[], isSuperadmin = false) => {
+  try {
+    setBusy(b => ({ ...b, clients: true }));
 
-    (async () => {
-      try {
-        const r = await fetchWithAuth("/auth/me");
-        const payload = await r.json();
-        const me: Me = payload?.user ?? payload;
-        if (!isMounted) return;
-        setUser(me);
-        localStorage.setItem("currentUser", JSON.stringify(me));
-
-        const sites = me?.sites || [];
-        if (sites.length === 0) {
-          // нет сайтов — просто покажем пустое состояние
-          setBusy({ stats: false, clients: false });
-        } else {
-          setBusy({ stats: true, clients: true });
-          await Promise.all([loadStats(sites), loadClients(sites)]);
-        }
-      } catch {
-        if (!isMounted) return;
-        setUser(null);
-        navigate("/auth", { replace: true });
-        return;
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    })();
-
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "auth_access" && !e.newValue) navigate("/auth", { replace: true });
-    };
-    window.addEventListener("storage", onStorage);
-    return () => {
-      isMounted = false;
-      window.removeEventListener("storage", onStorage);
-    };
-  }, [navigate]);
-
-  // === Loaders scoped by sites ===
-  const loadClients = async (sites: string[]) => {
-    try {
-      if (!sites || sites.length === 0) {
-        setClients([]);
-        return;
-      }
-      const q = encodeURIComponent(sites.join(","));
-      const r = await fetchWithAuth(`/admin/clients?sites=${q}`); // ожидаем, что бэк сам отфильтрует
-      let data: Client[] = await r.json();
-
-      // Fallback: если бэк вернул шире — фильтруем по client.siteId (если поле есть)
-      const siteSet = new Set(sites);
-      if (Array.isArray(data) && data.length && (data as any)[0]?.siteId) {
-        data = data.filter((c: any) => siteSet.has(c.siteId));
-      }
-
-      const sorted = (data || []).slice().sort((a, b) =>
-        a.slug === "widget" ? -1 : b.slug === "widget" ? 1 : 0
-      );
-      setClients(sorted);
-    } catch (e) {
-      console.error("Error loading clients:", e);
-    } finally {
-      setBusy((b) => ({ ...b, clients: false }));
+    // Суперадмин без sites -> берём публичный список
+    if ((!sites || sites.length === 0) && isSuperadmin) {
+      const r = await fetch(`${PUBLIC_API_ROOT}/clients`, { credentials: "omit" });
+      if (!r.ok) throw new Error(await r.text());
+      const data: RawClient[] = await r.json();
+      const list = normalizeClients(Array.isArray(data) ? data : (data?.clients || []));
+      setClients(list);
+      return;
     }
-  };
+
+    if (!sites || sites.length === 0) {
+      setClients([]);
+      return;
+    }
+
+    const q = encodeURIComponent(sites.join(","));
+    const r = await fetchWithAuth(`/admin/clients?sites=${q}`);
+    const data: RawClient[] = await r.json();
+    let list = normalizeClients(data);
+
+    const siteSet = new Set(sites);
+    if (list.length && list[0]?.siteId) {
+      list = list.filter(c => siteSet.has(c.siteId as string));
+    }
+    setClients(list.slice().sort((a,b) => a.slug==='widget' ? -1 : b.slug==='widget' ? 1 : 0));
+  } catch (e) {
+    console.error("Error loading clients:", e);
+  } finally {
+    setBusy(b => ({ ...b, clients: false }));
+  }
+};
+
 
   const loadStats = async (sites: string[]) => {
     try {
@@ -210,6 +196,78 @@ export default function Dashboard() {
       setBusy((b) => ({ ...b, stats: false }));
     }
   };
+
+  async function loadGlobalClientCount(isMountedRef?: { current: boolean }) {
+    try {
+      const res = await fetch(`${PUBLIC_API_ROOT}/clients`, { credentials: "omit" });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+
+      let total = 0;
+      if (Array.isArray(data)) total = data.length;
+      else if (data && typeof data.total === "number") total = data.total;
+      else if (data && Array.isArray(data.clients)) total = data.clients.length;
+
+      if (!isMountedRef || isMountedRef.current) setSuperadminTotalClients(total);
+    } catch (e) {
+      console.error("Failed to load global clients:", e);
+      if (!isMountedRef || isMountedRef.current) setSuperadminTotalClients(null);
+    }
+  }
+
+  // === Initial auth check and data load ===
+  useEffect(() => {
+    let isMounted = true;
+    const mref = { current: true };
+
+    (async () => {
+      try {
+        const r = await fetchWithAuth("/auth/me");
+        const payload = await r.json();
+        const me: Me = payload?.user ?? payload;
+        if (!isMounted) return;
+        setUser(me);
+        localStorage.setItem("currentUser", JSON.stringify(me));
+
+        if (me?.roles?.includes("superadmin")) {
+          loadGlobalClientCount(mref);
+        }
+
+        const sites = me?.sites || [];
+const superFlag = me?.roles?.includes("superadmin");
+
+if (!sites.length && !superFlag) {
+  setBusy({ stats: false, clients: false });
+} else {
+  setBusy({ stats: true, clients: true });
+  // для супер-админа без sites: stats можно нулями, а клиентов грузим фолбэком
+  await Promise.all([
+    sites.length ? loadStats(sites) : Promise.resolve(),
+    loadClients(sites, !!superFlag),
+  ]);
+}
+
+      } catch {
+        if (!isMounted) return;
+        setUser(null);
+        navigate("/auth", { replace: true });
+        return;
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    })();
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "auth_access" && !e.newValue) navigate("/auth", { replace: true });
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      isMounted = false;
+      mref.current = false;
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [navigate]); // <-- эта скобка закрывает useEffect, всё ок
 
   // === Actions ===
   const handleLogout = async () => {
@@ -253,6 +311,8 @@ export default function Dashboard() {
 
   if (!user) return null;
 
+  const isSuperadminFlag = isSuperadmin;
+
   // === UI ===
   return (
     <div className="min-h-screen bg-background">
@@ -286,16 +346,14 @@ export default function Dashboard() {
 
           {/* Overview */}
           <TabsContent value="overview" className="space-y-6">
-            {!user.sites || user.sites.length === 0 ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>No sites assigned</CardTitle>
-                  <CardDescription>
-                    You are authenticated but have no sites. Contact an administrator to be assigned.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            ) : (
+{(!isSuperadminFlag && (!user.sites || user.sites.length === 0)) ? (
+  <Card>
+    <CardHeader>
+      <CardTitle>No sites assigned</CardTitle>
+      <CardDescription>You don't have access to any clients yet.</CardDescription>
+    </CardHeader>
+  </Card>
+) : (
               <>
                 <div className="flex flex-wrap gap-2">
                   {user.sites.map((s) => (
@@ -306,16 +364,30 @@ export default function Dashboard() {
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  {/* Total Clients */}
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {isSuperadminFlag ? "Total Clients (All Tenants)" : "Total Clients"}
+                      </CardTitle>
                       <Building2 className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {busy.stats ? <Skeleton className="h-7 w-10" /> : stats.totalClients}
+                        {isSuperadminFlag
+                          ? (superadminTotalClients ?? <Skeleton className="h-7 w-10" />)
+                          : (busy.stats ? <Skeleton className="h-7 w-10" /> : stats.totalClients)}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">Active client accounts</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {isSuperadminFlag
+                          ? "Active client accounts"
+                          : "Active client accounts (scoped to your sites)"}
+                      </p>
+                      {isSuperadminFlag && !busy.stats && (
+                        <p className="text-[11px] text-muted-foreground mt-2">
+                          Your sites: {stats.totalClients}
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
 
