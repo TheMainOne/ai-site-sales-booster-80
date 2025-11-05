@@ -441,77 +441,85 @@ if (!sites.length && !superFlag) {
             )}
           </TabsContent>
 
-          {/* Clients */}
-          <TabsContent value="clients" className="space-y-6">
-            {!user.sites || user.sites.length === 0 ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>No sites assigned</CardTitle>
-                  <CardDescription>You don't have access to any clients yet.</CardDescription>
-                </CardHeader>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>All Clients</CardTitle>
-                  <CardDescription>Only clients from your sites are listed</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {busy.clients ? (
-                    <div className="grid gap-3">
-                      <Skeleton className="h-16" />
-                      <Skeleton className="h-16" />
-                      <Skeleton className="h-16" />
+        {/* Clients */}
+<TabsContent value="clients" className="space-y-6">
+  <Card className="border-none shadow-none">
+    <CardHeader className="px-0">
+      <CardTitle className="text-2xl">All Clients</CardTitle>
+      <CardDescription>Manage client accounts and their configurations</CardDescription>
+    </CardHeader>
+    <CardContent className="px-0">
+      {busy.clients ? (
+        <div className="grid gap-3">
+          <Skeleton className="h-20 rounded-2xl" />
+          <Skeleton className="h-20 rounded-2xl" />
+        </div>
+      ) : clients.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">No clients found</div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {clients.map((client) => {
+            const created =
+              client.created_at ? new Date(client.created_at).toLocaleDateString() : "—";
+            const isPrimary = client.slug === "widget";
+
+            return (
+              <div
+                key={client.id}
+                className="rounded-2xl border bg-card px-5 py-4 shadow-sm hover:shadow transition-shadow"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate text-base font-semibold">{client.name}</h3>
+                      {isPrimary && (
+                        <span className="shrink-0 rounded-md bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
+                          Primary
+                        </span>
+                      )}
+                      {client.is_active === false && (
+                        <span className="shrink-0 rounded-md bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
+                          Inactive
+                        </span>
+                      )}
                     </div>
-                  ) : clients.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">No clients found</div>
-                  ) : (
-                    <div className="space-y-3">
-                      {clients.map((client) => (
-                        <div
-                          key={client.id}
-                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold">{client.name}</h3>
-                              {client.slug === "widget" && (
-                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                                  Primary
-                                </span>
-                              )}
-                              {client.is_active === false && (
-                                <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">
-                                  Inactive
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                              <span>Slug: {client.slug}</span>
-                              <span>•</span>
-                              <span>Created: {new Date(client.created_at).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => window.open(`/demo/${client.slug}`, "_blank")}
-                            >
-                              <ExternalLink className="w-4 h-4 mr-2" /> Demo
-                            </Button>
-                            <Button size="sm" onClick={() => handleManageClient(client.id)}>
-                              Manage
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                      <span className="truncate">Slug: {client.slug}</span>
+                      <span>•</span>
+                      <span>Created: {created}</span>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl"
+                      onClick={() => window.open(`/demo/${client.slug}`, "_blank")}
+                      title="Open demo in a new tab"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Demo
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="rounded-xl"
+                      onClick={() => handleManageClient(client.id)}
+                    >
+                      Manage
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+</TabsContent>
+
 
           {/* Users & Roles (заглушка) */}
           <TabsContent value="users" className="space-y-6">
