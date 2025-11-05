@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import heroImage from "@/assets/hero-ai-widget.jpg";
+import AnimatedChatDemo from "./AnimatedChatDemo.tsx";
+
 
 const Hero = () => {
   const scrollToDemo = () => {
@@ -82,15 +83,16 @@ const Hero = () => {
             </div>
           </div>
 
-          {/* Hero Image */}
-          <div className="relative">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-              <img 
-                src={heroImage} 
-                alt="AI Widget Demo Interface"
-                className="w-full h-auto"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-purple-accent/20 to-transparent" />
+  {/* Chat Demo вместо картинки */}
+<div className="relative">
+  {/* убрал p-2, bg-*, border, оставил только тень и скругление */}
+  <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+    <div className="rounded-xl overflow-hidden">
+      <AnimatedChatDemo />
+    </div>
+
+              {/* Лёгкое подсвечивание снизу, как у твоего изображения */}
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-purple-accent/10 to-transparent" />
             </div>
           </div>
         </div>
