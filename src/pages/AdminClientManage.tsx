@@ -118,7 +118,7 @@ export default function AdminClientManage() {
               <BreadcrumbSeparator />
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link to="/admin">Clients</Link>
+                  <Link to="/dashboard">Clients</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
