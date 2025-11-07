@@ -22,6 +22,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const PUBLIC_API_ROOT = "https://cloudcompliance.duckdns.org/api";
 
+// ===== Documents API helpers (подправь пути, если у тебя иные роуты) =====
+const DOCS_API = {
+  list:     (id: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents`,
+  upload:   (id: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents`,
+  download: (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/download`,
+  text:     (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/text`,
+  remove:   (id: string, docId: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}`,
+};
+
 // ===== Types =====
 type ClientDTO = {
   _id: string;
@@ -49,7 +58,6 @@ type UserDTO = {
   email?: string;
   name?: string;
   createdAt?: string;
-  // любые другие поля, которые возвращает твой бэкенд
 };
 
 const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant.
@@ -61,7 +69,20 @@ CONTENT RULES:
 4. If information is not in the knowledge base - honestly say so and suggest contacting support
 5. DO NOT use general knowledge - ONLY the knowledge base provided`;
 
-type Document = {
+// Для списка документов (как приходит с бэка)
+type DocDTO = {
+  _id: string;
+  clientId?: string;
+  fileName: string;
+  title?: string;
+  contentType?: string;
+  size?: number;
+  isActive?: boolean;
+  createdAt?: string;
+};
+
+// Для диалога превью (локальный тип)
+type DocumentDialog = {
   id: string;
   title: string;
   file_name: string;
@@ -100,14 +121,28 @@ export default function AdminClientManage() {
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
-  // demo placeholders for docs (позже подключишь реальные /clients/:id/documents)
-  const documents: Document[] = useMemo(
-    () => [
-      { id: "1", title: "Pricing", file_name: "pricing.pdf", is_active: true, created_at: new Date().toISOString(), file_size: 24000, content: "Sample content…" },
-      { id: "2", title: "FAQ", file_name: "faq.docx", is_active: false, created_at: new Date().toISOString(), file_size: 12300, content: "Sample content…" },
-    ],
-    []
-  );
+  // ===== Documents state (REAL data) =====
+  const [docsLoading, setDocsLoading] = useState(true);
+  const [docsError, setDocsError] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<DocDTO[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
+  // ===== Dialog state for preview =====
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState<DocumentDialog | null>(null);
+
+  // ===== Users add form =====
+  const [emailInput, setEmailInput] = useState("");
+
+  // ===== Helpers =====
+  const copyToClipboard = (t: string) => navigator.clipboard?.writeText(t);
+  const generateEmbedCode = (apiKey: string) => `<!-- AI Sales Widget -->
+<script>
+  window.salesWidgetConfig = { apiKey: '${apiKey}' };
+</script>
+<script src="${window.location.origin}/widget-embed.js"></script>`;
 
   // ===== Fetch client by :clientId (id or slug) =====
   useEffect(() => {
@@ -167,7 +202,6 @@ export default function AdminClientManage() {
         const data: any = await res.json();
         if (!alive) return;
 
-        // нормализация в унифицированный массив
         const list: UserDTO[] = Array.isArray(data) ? data : (data?.users || []);
         setClientUsers(list);
       } catch (e: any) {
@@ -183,11 +217,40 @@ export default function AdminClientManage() {
     };
   }, [clientId]);
 
-  // ===== UI handlers =====
-  const [emailInput, setEmailInput] = useState("");
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [viewingDocument, setViewingDocument] = useState<Document | null>(null);
+  // ===== Fetch REAL documents of client =====
+  async function fetchDocuments() {
+    if (!clientId) return;
+    setDocsLoading(true);
+    setDocsError(null);
+    try {
+      const res = await fetch(DOCS_API.list(clientId), { credentials: "omit" });
+      if (!res.ok) throw new Error(await res.text());
+      const list = await res.json();
+      const mapped: DocDTO[] = (Array.isArray(list) ? list : []).map((d: any) => ({
+        _id: d._id,
+        clientId: d.clientId,
+        fileName: d.fileName || d.originalName || d.name,
+        title: d.title || d.fileName || d.originalName || d.name,
+        contentType: d.contentType || d.mimeType,
+        size: typeof d.size === "number" ? d.size : d.fileSize,
+        isActive: d.isActive ?? true,
+        createdAt: d.createdAt || d.uploadedAt,
+      }));
+      setDocuments(mapped);
+    } catch (e: any) {
+      setDocsError(e?.message || "Failed to load documents");
+      setDocuments([]);
+    } finally {
+      setDocsLoading(false);
+    }
+  }
 
+  useEffect(() => {
+    fetchDocuments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
+
+  // ===== Upload handlers =====
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -196,19 +259,104 @@ export default function AdminClientManage() {
     reader.readAsDataURL(file);
   };
   const handleRemoveLogo = () => setLogoPreview(null);
-  const handleViewDocument = (doc: Document) => {
-    setViewingDocument(doc);
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !clientId) return;
+
+    setUploadError(null);
+    setUploading(true);
+    setUploadProgress(null);
+
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", DOCS_API.upload(clientId), true);
+        // Если нужна авторизация JWT:
+        // xhr.setRequestHeader("Authorization", `Bearer ${getAccessToken()}`);
+
+        xhr.upload.onprogress = (evt) => {
+          if (evt.lengthComputable) {
+            setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(xhr.responseText || `Upload failed (${xhr.status})`));
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(fd);
+      });
+
+      await fetchDocuments();
+    } catch (e: any) {
+      setUploadError(e?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+      setUploadProgress(null);
+      e.currentTarget.value = "";
+    }
+  }
+
+  // ===== View / Download / Delete handlers =====
+  async function handleViewDocumentById(doc: DocDTO) {
+    try {
+      const res = await fetch(DOCS_API.text(doc._id), { credentials: "omit" });
+      if (res.ok) {
+        const data = await res.json();
+        const content = typeof data === "string" ? data : (data?.text ?? "");
+        setViewingDocument({
+          id: doc._id,
+          title: doc.title || doc.fileName,
+          file_name: doc.fileName,
+          is_active: !!doc.isActive,
+          created_at: doc.createdAt || new Date().toISOString(),
+          file_size: doc.size || 0,
+          content: content || "No preview available",
+        });
+        setIsViewDialogOpen(true);
+        return;
+      }
+    } catch (_) {}
+    setViewingDocument({
+      id: doc._id,
+      title: doc.title || doc.fileName,
+      file_name: doc.fileName,
+      is_active: !!doc.isActive,
+      created_at: doc.createdAt || new Date().toISOString(),
+      file_size: doc.size || 0,
+      content: "Preview is not available for this file type. Use Download.",
+    });
     setIsViewDialogOpen(true);
-  };
-  const handleDownloadDocument = (doc: Document) => {
-    console.log("download", doc.id);
-  };
-  const copyToClipboard = (t: string) => navigator.clipboard?.writeText(t);
-  const generateEmbedCode = (apiKey: string) => `<!-- AI Sales Widget -->
-<script>
-  window.salesWidgetConfig = { apiKey: '${apiKey}' };
-</script>
-<script src="${window.location.origin}/widget-embed.js"></script>`;
+  }
+
+  function handleDownloadDocumentById(doc: DocDTO) {
+    const url = DOCS_API.download(doc._id);
+    window.open(url, "_blank");
+  }
+
+async function handleDeleteDocument(doc: DocDTO) {
+  if (!clientId) {
+    alert("ClientId is missing in route.");
+    return;
+  }
+  if (!confirm(`Delete "${doc.fileName}"?`)) return;
+
+  try {
+    const res = await fetch(DOCS_API.remove(clientId, doc._id), {
+      method: "DELETE",
+      credentials: "omit",
+    });
+    if (!res.ok) throw new Error(await res.text());
+    await fetchDocuments();
+  } catch (e: any) {
+    alert(e?.message || "Failed to delete");
+  }
+}
+
 
   // ===== Save (PATCH /clients/:slug) — partial config update =====
   const handleSaveSettings = async () => {
@@ -447,7 +595,7 @@ export default function AdminClientManage() {
                         <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                         <p className="text-xs text-blue-800">
                           <strong>Note:</strong> Your custom prompt is active.
-                          </p>
+                        </p>
                       </div>
                     )}
                   </div>
@@ -476,7 +624,21 @@ export default function AdminClientManage() {
                       <p className="text-sm text-muted-foreground mb-2">
                         Upload TXT, PDF, or DOCX files
                       </p>
-                      <Input type="file" className="max-w-xs mx-auto" disabled />
+                      <div className="flex flex-col items-center gap-2">
+                        <Input
+                          type="file"
+                          accept=".txt,.pdf,.docx"
+                          className="max-w-xs mx-auto"
+                          onChange={handleFileSelected}
+                          disabled={uploading}
+                        />
+                        {uploadProgress !== null && (
+                          <p className="text-xs text-muted-foreground">Uploading… {uploadProgress}%</p>
+                        )}
+                        {uploadError && (
+                          <p className="text-xs text-destructive">{uploadError}</p>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground mt-3">
                         Upload documents containing information about your products, services, or FAQs.
                       </p>
@@ -484,34 +646,67 @@ export default function AdminClientManage() {
 
                     <div className="space-y-2">
                       <h3 className="font-semibold">Your Documents</h3>
-                      {documents.map((doc) => (
-                        <div
-                          key={doc.id}
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="flex-1">
-                            <p className="font-medium">{doc.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {doc.file_name} • {(doc.file_size / 1024).toFixed(1)} KB •{" "}
-                              {new Date(doc.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleViewDocument(doc)} title="View">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDownloadDocument(doc)} title="Download">
-                              <Download className="w-4 h-4" />
-                            </Button>
-                            <Button variant={doc.is_active ? "default" : "outline"} size="sm" disabled>
-                              {doc.is_active ? "Active" : "Inactive"}
-                            </Button>
-                            <Button variant="ghost" size="sm" disabled>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+
+                      {docsLoading ? (
+                        <div className="space-y-2">
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
                         </div>
-                      ))}
+                      ) : docsError ? (
+                        <div className="p-3 border border-destructive rounded text-destructive text-sm">
+                          {docsError}
+                        </div>
+                      ) : documents.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">No documents yet.</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {documents.map((doc) => (
+                            <div
+                              key={doc._id}
+                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                            >
+                              <div className="flex-1">
+                                <p className="font-medium">{doc.title || doc.fileName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {doc.fileName}
+                                  {doc.size ? ` • ${(doc.size / 1024).toFixed(1)} KB` : ""} •{" "}
+                                  {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : ""}
+                                  {doc.contentType ? ` • ${doc.contentType}` : ""}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewDocumentById(doc)}
+                                  title="View"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDownloadDocumentById(doc)}
+                                  title="Download"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </Button>
+                                <Button variant={doc.isActive ? "default" : "outline"} size="sm" disabled>
+                                  {doc.isActive ? "Active" : "Inactive"}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteDocument(doc)}
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -703,7 +898,7 @@ export default function AdminClientManage() {
                 </pre>
               </ScrollArea>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => viewingDocument && handleDownloadDocument(viewingDocument)}>
+                <Button variant="outline" onClick={() => viewingDocument && window.open(DOCS_API.download(viewingDocument.id), "_blank")}>
                   <Download className="w-4 h-4 mr-2" />
                   Download
                 </Button>
