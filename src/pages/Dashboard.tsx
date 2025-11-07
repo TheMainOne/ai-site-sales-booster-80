@@ -307,9 +307,9 @@ if (!sites.length && !superFlag) {
     }
   };
 
-  const handleManageClient = (clientId: string) => {
-    navigate(`/admin/client/${clientId}`);
-  };
+const handleManageClient = (idOrSlug: string) => {
+  navigate(`/admin/client/${idOrSlug}`); // id или slug — оба поддерживаются на бэке
+};
 
   // === Loading skeleton ===
   if (loading) {
