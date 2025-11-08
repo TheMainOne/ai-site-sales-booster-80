@@ -137,6 +137,8 @@ export default function Dashboard() {
   const [superadminTotalClients, setSuperadminTotalClients] = useState<number | null>(null);
   const [superadminTotalDocuments, setSuperadminTotalDocuments] = useState<number | null>(null);
   const [superadminTotalUsers, setSuperadminTotalUsers] = useState<number | null>(null);
+  const [superadminTotalActiveSessions, setSuperadminTotalActiveSessions] = useState<number | null>(null);
+  const [superadminActiveSessionsMeta, setSuperadminActiveSessionsMeta] = useState<{ days: number; uniqueBy: string } | null>(null);
   const isSuperadmin = !!(user?.roles && user.roles.includes("superadmin"));
 
   // вынесенные лоадеры (проще читать и меньше шансов перепутать скобки)
@@ -192,6 +194,27 @@ async function loadGlobalDocumentCount(isMountedRef?: { current: boolean }) {
   }
 }
 
+async function loadGlobalActiveSessions(isMountedRef?: { current: boolean }) {
+  try {
+    const res = await fetch(`${PUBLIC_API_ROOT}/statistic/sessions/active/count`, { credentials: "omit" });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json(); // { total, days, uniqueBy, scope }
+
+    if (!isMountedRef || isMountedRef.current) {
+      setSuperadminTotalActiveSessions(typeof data?.total === "number" ? data.total : 0);
+      setSuperadminActiveSessionsMeta({
+        days: typeof data?.days === "number" ? data.days : 30,
+        uniqueBy: data?.uniqueBy || "visitorId",
+      });
+    }
+  } catch (e) {
+    console.error("Failed to load global active sessions:", e);
+    if (!isMountedRef || isMountedRef.current) {
+      setSuperadminTotalActiveSessions(null);
+      setSuperadminActiveSessionsMeta(null);
+    }
+  }
+}
 
 
   const loadStats = async (sites: string[]) => {
@@ -270,7 +293,8 @@ async function loadGlobalUserCount(isMountedRef?: { current: boolean }) {
 if (me?.roles?.includes("superadmin")) {
   loadGlobalClientCount(mref);
   loadGlobalUserCount(mref);
-  loadGlobalDocumentCount(mref);    
+  loadGlobalDocumentCount(mref);   
+   loadGlobalActiveSessions(mref);  
 }
 
 
@@ -478,18 +502,30 @@ const handleManageClient = (idOrSlug: string) => {
 </Card>
 
 
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {busy.stats ? <Skeleton className="h-7 w-10" /> : stats.activeSessions}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">Last 30 days</p>
-                    </CardContent>
-                  </Card>
+<Card>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
+    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+  </CardHeader>
+  <CardContent>
+    <div className="text-2xl font-bold">
+      {isSuperadminFlag
+        ? (superadminTotalActiveSessions ?? <Skeleton className="h-7 w-10" />)
+        : (busy.stats ? <Skeleton className="h-7 w-10" /> : stats.activeSessions)}
+    </div>
+    <p className="text-xs text-muted-foreground mt-1">
+      {isSuperadminFlag
+        ? `Unique ${superadminActiveSessionsMeta?.uniqueBy === "sessionId" ? "sessions" : "visitors"} last ${superadminActiveSessionsMeta?.days ?? 30} days (all tenants)`
+        : "Unique visitors last 30 days"}
+    </p>
+    {isSuperadminFlag && !busy.stats && (
+      <p className="text-[11px] text-muted-foreground mt-2">
+        Your sites: {stats.activeSessions}
+      </p>
+    )}
+  </CardContent>
+</Card>
+
                 </div>
 
                 <Card>
