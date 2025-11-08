@@ -135,6 +135,7 @@ export default function Dashboard() {
   });
   const [busy, setBusy] = useState<{ stats?: boolean; clients?: boolean }>({});
   const [superadminTotalClients, setSuperadminTotalClients] = useState<number | null>(null);
+  const [superadminTotalDocuments, setSuperadminTotalDocuments] = useState<number | null>(null);
   const [superadminTotalUsers, setSuperadminTotalUsers] = useState<number | null>(null);
   const isSuperadmin = !!(user?.roles && user.roles.includes("superadmin"));
 
@@ -174,6 +175,23 @@ const loadClients = async (sites: string[], isSuperadmin = false) => {
     setBusy(b => ({ ...b, clients: false }));
   }
 };
+
+
+async function loadGlobalDocumentCount(isMountedRef?: { current: boolean }) {
+  try {
+    const res = await fetch(`${PUBLIC_API_ROOT}/clients/documents/count`, { credentials: "omit" });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    // ожидаем { total: number }
+    const total = typeof data?.total === "number" ? data.total : 0;
+    if (!isMountedRef || isMountedRef.current) setSuperadminTotalDocuments(total);
+  } catch (e) {
+    console.error("Failed to load global documents:", e);
+    if (!isMountedRef || isMountedRef.current) setSuperadminTotalDocuments(null);
+  }
+}
+
 
 
   const loadStats = async (sites: string[]) => {
@@ -252,6 +270,7 @@ async function loadGlobalUserCount(isMountedRef?: { current: boolean }) {
 if (me?.roles?.includes("superadmin")) {
   loadGlobalClientCount(mref);
   loadGlobalUserCount(mref);
+  loadGlobalDocumentCount(mref);    
 }
 
 
@@ -413,18 +432,28 @@ const handleManageClient = (idOrSlug: string) => {
                     </CardContent>
                   </Card>
 
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Documents</CardTitle>
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {busy.stats ? <Skeleton className="h-7 w-10" /> : stats.totalDocuments}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">Knowledge base documents</p>
-                    </CardContent>
-                  </Card>
+<Card>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">Documents</CardTitle>
+    <FileText className="h-4 w-4 text-muted-foreground" />
+  </CardHeader>
+  <CardContent>
+    <div className="text-2xl font-bold">
+      {isSuperadminFlag
+        ? (superadminTotalDocuments ?? <Skeleton className="h-7 w-10" />)
+        : (busy.stats ? <Skeleton className="h-7 w-10" /> : stats.totalDocuments)}
+    </div>
+    <p className="text-xs text-muted-foreground mt-1">
+      {isSuperadminFlag ? "Knowledge base documents (all tenants)" : "Knowledge base documents"}
+    </p>
+    {isSuperadminFlag && !busy.stats && (
+      <p className="text-[11px] text-muted-foreground mt-2">
+        Your sites: {stats.totalDocuments}
+      </p>
+    )}
+  </CardContent>
+</Card>
+
 
                <Card>
   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
