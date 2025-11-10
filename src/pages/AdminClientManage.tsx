@@ -1,5 +1,5 @@
 // src/pages/AdminClientManage.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -29,6 +29,7 @@ const TOAST_WARNING = {
 };
 
 const PUBLIC_API_ROOT = "https://cloudcompliance.duckdns.org/api";
+const API_ORIGIN = new URL(PUBLIC_API_ROOT).origin;
 
 // ===== Documents API helpers =====
 const DOCS_API = {
@@ -83,7 +84,6 @@ CONTENT RULES:
 4. If information is not in the knowledge base - honestly say so and suggest contacting support
 5. DO NOT use general knowledge - ONLY the knowledge base provided`;
 
-// Для списка документов (как приходит с бэка)
 type DocDTO = {
   _id: string;
   clientId?: string;
@@ -95,7 +95,6 @@ type DocDTO = {
   createdAt?: string;
 };
 
-// Для диалога превью (локальный тип)
 type DocumentDialog = {
   id: string;
   title: string;
@@ -121,6 +120,11 @@ export default function AdminClientManage() {
   const [usersError, setUsersError] = useState<string | null>(null);
   const [clientUsers, setClientUsers] = useState<UserDTO[]>([]);
 
+  // ===== Active tab (controlled) =====
+  const [activeTab, setActiveTab] = useState<
+    "setup" | "knowledge" | "users" | "code" | "demo" | "analytics"
+  >("setup");
+
   // ===== Widget settings UI (from WidgetConfig) =====
   const [settings, setSettings] = useState({
     widget_title: "AI Assistant",
@@ -129,8 +133,9 @@ export default function AdminClientManage() {
     background_color: "#0f0f0f",
     text_color: "#ffffff",
     border_color: "#2927ea",
-    logo_url: null as string | null, // хранит logoUrl (с бэка) или base64 превью
+    logo_url: null as string | null,
     system_prompt: DEFAULT_SYSTEM_PROMPT,
+    site_id: "",
   });
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -154,9 +159,12 @@ export default function AdminClientManage() {
   const copyToClipboard = (t: string) => navigator.clipboard?.writeText(t);
   const generateEmbedCode = (apiKey: string) => `<!-- AI Sales Widget -->
 <script>
-  window.salesWidgetConfig = { apiKey: '${apiKey}' };
+  window.salesWidgetConfig = { apiKey: '${apiKey}', host: '${API_ORIGIN}' };
 </script>
-<script src="${window.location.origin}/widget-embed.js"></script>`;
+<script src="${API_ORIGIN}/widget-embed.js"></script>`;
+
+  // ===== IFRAME PREVIEW REF =====
+  const previewRef = useRef<HTMLIFrameElement | null>(null);
 
   // ===== Fetch client by :clientId (id or slug) + WidgetConfig =====
   useEffect(() => {
@@ -165,7 +173,6 @@ export default function AdminClientManage() {
       setLoading(true);
       setError(null);
       try {
-        // 1) тянем клиента
         const res = await fetch(`${PUBLIC_API_ROOT}/clients/${encodeURIComponent(clientId || "")}`, {
           credentials: "omit",
         });
@@ -175,7 +182,6 @@ export default function AdminClientManage() {
 
         setClient(data);
 
-        // 2) тянем конфиг виджета
         if (clientId) {
           const cfgRes = await fetch(WIDGET_CFG_API.get(clientId), { credentials: "omit" });
           if (cfgRes.ok) {
@@ -193,6 +199,7 @@ export default function AdminClientManage() {
                 (cfg?.customSystemPrompt && String(cfg.customSystemPrompt).trim().length
                   ? cfg.customSystemPrompt
                   : DEFAULT_SYSTEM_PROMPT),
+              site_id:          cfg.siteId ?? "",
             });
             setLogoPreview(null);
           }
@@ -204,12 +211,10 @@ export default function AdminClientManage() {
         if (alive) setLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [clientId]);
 
-  // ===== Fetch REAL users of client (/clients/:idOrSlug/users) =====
+  // ===== Fetch REAL users of client =====
   useEffect(() => {
     if (!clientId) return;
     let alive = true;
@@ -234,9 +239,7 @@ export default function AdminClientManage() {
         if (alive) setUsersLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [clientId]);
 
   // ===== Fetch REAL documents of client =====
@@ -266,11 +269,7 @@ export default function AdminClientManage() {
       setDocsLoading(false);
     }
   }
-
-  useEffect(() => {
-    fetchDocuments();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId]);
+  useEffect(() => { fetchDocuments(); /* eslint-disable-next-line */ }, [clientId]);
 
   // ===== Upload handlers =====
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -297,7 +296,6 @@ export default function AdminClientManage() {
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", DOCS_API.upload(clientId), true);
-        // xhr.setRequestHeader("Authorization", `Bearer ${getAccessToken()}`);
 
         xhr.upload.onprogress = (evt) => {
           if (evt.lengthComputable) {
@@ -382,13 +380,13 @@ export default function AdminClientManage() {
     }
   }
 
-  // ===== Save (PUT /clients/:idOrSlug/widget-config) — upsert WidgetConfig =====
+  // ===== Save (PUT /clients/:idOrSlug/widget-config) =====
   const handleSaveSettings = async () => {
     if (!clientId) return;
     setSaving(true);
     setError(null);
     try {
-      const payload = {
+      const payload: any = {
         widgetTitle:        settings.widget_title,
         welcomeMessage:     settings.welcome_message,
         primaryColor:       settings.primary_color,
@@ -399,6 +397,8 @@ export default function AdminClientManage() {
         logoUrl:            logoPreview ?? settings.logo_url ?? null,
         isActive:           true,
       };
+      if (settings.site_id && settings.site_id.trim()) payload.siteId = settings.site_id.trim();
+
       const res = await fetch(WIDGET_CFG_API.put(clientId), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -417,6 +417,7 @@ export default function AdminClientManage() {
         text_color:       config?.textColor        ?? prev.text_color,
         border_color:     config?.borderColor      ?? prev.border_color,
         logo_url:         config?.logoUrl ?? prev.logo_url,
+        site_id:          config?.siteId ?? prev.site_id,
         system_prompt:
           (config?.customSystemPrompt && String(config.customSystemPrompt).trim().length
             ? config.customSystemPrompt
@@ -433,10 +434,246 @@ export default function AdminClientManage() {
     }
   };
 
+  // ===== Helper to inject preview HTML into iframe (REAL chat, no inner scrollbars) =====
+  function injectPreview() {
+    if (!previewRef.current || !client) return;
+
+    const iframe = previewRef.current;
+    const doc = iframe.contentDocument || (iframe as any).ownerDocument;
+    if (!doc) return;
+
+    // 1) Minimal shell (без <style> внутри)
+    const shell = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8"/>
+          <meta name="viewport" content="width=device-width,initial-scale=1"/>
+          <title>Widget Preview</title>
+        </head>
+        <body>
+          <div class="host">
+            <div id="widget" class="card" aria-live="polite">
+              <div class="head">
+                <div class="logo" id="logo"></div>
+                <div class="title" id="title"></div>
+              </div>
+              <div class="body">
+                <div class="messages" id="messages">
+                  <div class="row ai"><div class="bubble" id="welcome"></div></div>
+                </div>
+                <div class="input">
+                  <input id="inp" placeholder="Type a message…" aria-label="Type a message…"/>
+                  <button id="send">Send</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>`;
+    doc.open(); doc.write(shell); doc.close();
+
+    // 2) Styles as a node
+    const style = doc.createElement("style");
+    style.textContent = `
+      :root { color-scheme: dark; }
+      html,body { height:100%; margin:0; background:#0a0a0a; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+
+      .host { height:100%; width:100%; display:flex; }
+      .card {
+        flex:1; display:flex; flex-direction:column;
+        background: var(--bg, #111);
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 10px;
+      }
+        .body, .messages { background: var(--bg, #111); }
+.body { min-height: 0; }          /* flex fix, чтобы scroll работал корректно */
+     .head {
+  padding:12px 16px; display:flex; align-items:center; gap:10px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  background: var(--pill, #2b2f36);   /* новый фон */
+}
+.title { font-weight:700; font-size:14px; color:#ffffff; } /* белый текст */
+.logo  { width:28px; height:28px; border-radius:8px; background:#222; object-fit:contain; }
+
+      .body { flex:1; padding:16px; display:flex; flex-direction:column; gap:10px; }
+      .messages { flex:1; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+      .messages::-webkit-scrollbar { width: 8px; }
+.messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 8px; }
+.messages::-webkit-scrollbar-track { background: transparent; }
+      .row { display:flex; }
+      .me { justify-content:flex-end; }
+.bubble {
+  padding:10px 12px; border-radius:14px; max-width:85%;
+  white-space:pre-wrap; word-break:break-word; line-height:1.5;
+  border:1px solid transparent;
+  box-shadow: 0 1px 0 rgba(0,0,0,.2);
+  color:#fff;
+  background: var(--pill, #2b2f36); /* один и тот же стиль */
+}
+.me .bubble { background: var(--pill, #2b2f36); color:#fff; }
+.ai .bubble { background: var(--pill, #2b2f36); color:#fff; }
+      /* typing dots */
+      .typing .bubble { display:inline-flex; align-items:center; gap:6px; min-height:18px; }
+      .dot { width:6px; height:6px; border-radius:50%; background: currentColor; opacity:.4; animation: blink 1.2s infinite; }
+      .dot:nth-child(2) { animation-delay:.2s; }
+      .dot:nth-child(3) { animation-delay:.4s; }
+      @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+
+      /* нижняя панель ввода */
+.input {
+  display:flex; gap:8px; padding:12px;
+  border-top:1px solid rgba(255,255,255,.08);
+  /* отдельный фон, чтобы не сливался с body/messages */
+  background: #0e0e10;              /* можно #121417, если темнее нравится */
+}
+
+/* само поле ввода */
+.input input{
+  flex:1; height:40px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.16);
+  background:#101317;               /* НЕ прозрачный */
+  color:#e5e7eb; padding:10px 12px;
+  outline:none;
+}
+.input input::placeholder{ color:rgba(229,231,235,.55); }
+
+/* кнопка отправки — тот же «пилюльный» цвет */
+.input button{
+  border:0; border-radius:10px; padding:10px 14px;
+  color:#fff; cursor:pointer;
+  background: var(--pill, #2b2f36);
+}
+.input button:disabled{ opacity:.6; cursor:default; }
+
+    `;
+    (doc.head || doc.getElementsByTagName("head")[0]).appendChild(style);
+
+    // 3) Chat logic script
+    const script = doc.createElement("script");
+    script.type = "text/javascript";
+    script.textContent = `
+      (function () {
+        var cfg = {
+          title: ${JSON.stringify(settings.widget_title)},
+          welcome: ${JSON.stringify(settings.welcome_message)},
+          pColor: ${JSON.stringify(settings.primary_color)},
+          bgColor: ${JSON.stringify(settings.background_color)},
+          tColor: ${JSON.stringify(settings.text_color)},
+          bColor: ${JSON.stringify(settings.border_color || settings.primary_color)},
+          logo: ${JSON.stringify(settings.logo_url)},
+          siteId: ${JSON.stringify(settings.site_id || client?.siteId || "")},
+          clientId: ${JSON.stringify(client?._id || "")},
+          endpoint: "https://cloudcompliance.duckdns.org/api/aiw/chat"
+        };
+
+        var root = document.getElementById('widget');
+        root.style.setProperty('--bg', cfg.bgColor);
+        root.style.borderColor = cfg.bColor;
+        document.getElementById('title').textContent = cfg.title;
+
+        var logoEl = document.getElementById('logo');
+        if (cfg.logo) {
+          logoEl.style.background = "transparent";
+          logoEl.style.backgroundImage = "url('"+cfg.logo+"')";
+          logoEl.style.backgroundSize = "contain";
+          logoEl.style.backgroundRepeat = "no-repeat";
+          logoEl.style.backgroundPosition = "center";
+        } else {
+          logoEl.style.background = cfg.pColor;
+        }
+        document.getElementById('welcome').textContent = cfg.welcome;
+
+        var messages = document.getElementById('messages');
+        var inp = document.getElementById('inp');
+        var btn = document.getElementById('send');
+        function scrollToBottom(){ messages.scrollTop = messages.scrollHeight; }
+
+        function append(role, text) {
+          var row = document.createElement('div');
+          row.className = 'row ' + (role === 'user' ? 'me' : 'ai');
+          var bubble = document.createElement('div');
+          bubble.className = 'bubble';
+          if (role === 'user') { bubble.style.background = '#2b2f36'; bubble.style.color = '#fff'; bubble.style.borderColor='transparent'; }
+          else { bubble.style.background='rgba(255,255,255,.06)'; bubble.style.color='#e5e7eb'; bubble.style.borderColor='rgba(255,255,255,.08)'; }
+          bubble.textContent = text || '';
+          row.appendChild(bubble); messages.appendChild(row); scrollToBottom();
+          return bubble;
+        }
+
+        function showTyping(){
+          var row = document.createElement('div'); row.className='row ai typing';
+          var bubble = document.createElement('div'); bubble.className='bubble'; bubble.style.color='#e5e7eb';
+          for (var i=0;i<3;i++){ var d=document.createElement('span'); d.className='dot'; bubble.appendChild(d); }
+          row.appendChild(bubble); messages.appendChild(row); scrollToBottom(); return row;
+        }
+
+        async function sendMessage(){
+          var text = (inp.value || '').trim(); if (!text) return;
+          append('user', text); inp.value=''; btn.disabled = true;
+          var typingRow = showTyping(); var typingBubble = typingRow.querySelector('.bubble');
+
+          try {
+            const res = await fetch(cfg.endpoint, {
+              method: 'POST',
+              mode: 'cors',
+              headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream, application/json' },
+              body: JSON.stringify({ messages: [{ role: 'user', content: text }], siteId: cfg.siteId || null, clientId: cfg.clientId || null, source: 'admin-preview', stream: false })
+            });
+
+            if (!res.ok) {
+              const errText = await res.text().catch(()=> '');
+              typingBubble.textContent = 'Error ' + res.status + (errText ? (': ' + errText) : '');
+            } else {
+              const ctype = (res.headers.get('content-type') || '').toLowerCase();
+              if (ctype.includes('text/event-stream') && res.body) {
+                typingBubble.textContent = '';
+                const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+                while (true) {
+                  const { value, done } = await reader.read(); if (done) break;
+                  buf += dec.decode(value, { stream:false });
+                  const chunks = buf.split('\\n\\n'); buf = chunks.pop() || '';
+                  for (const chunk of chunks) {
+                    const line = chunk.split('\\n').find(l => l.startsWith('data:')) || chunk.trim();
+                    let payload = line.replace(/^data:\\s?/, '').trim();
+                    if (!payload || payload === '[DONE]') continue;
+                    try { const j = JSON.parse(payload); typingBubble.textContent += (j.delta || j.text || j.content || ''); }
+                    catch { typingBubble.textContent += payload; }
+                    scrollToBottom();
+                  }
+                }
+              } else {
+                const data = await res.json().catch(()=> ({}));
+                const msg = data.reply || data.answer || data.message || data.text ||
+                  (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || 'No response';
+                typingBubble.textContent = String(msg);
+              }
+            }
+          } catch (e) {
+            typingBubble.textContent = 'Network error: ' + (e && e.message ? e.message : 'request failed');
+          } finally {
+            typingRow.classList.remove('typing'); btn.disabled = false; scrollToBottom();
+          }
+        }
+
+        btn.addEventListener('click', sendMessage);
+        inp.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') sendMessage(); });
+      })();
+    `;
+    (doc.body || doc.getElementsByTagName("body")[0]).appendChild(script);
+  }
+
+  // ===== Re-inject when demo tab is active & data changes =====
+  useEffect(() => {
+    if (activeTab !== "demo") return;
+    injectPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, client, settings]);
+
   // ===== Render =====
   return (
     <div className="min-h-screen bg-background">
-
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-6 py-4">
@@ -496,7 +733,7 @@ export default function AdminClientManage() {
       ) : (
         /* Main */
         <div className="container mx-auto px-6 py-8">
-          <Tabs defaultValue="setup" className="space-y-6">
+          <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-6">
             <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="setup">Widget Setup</TabsTrigger>
               <TabsTrigger value="knowledge">Knowledge Base</TabsTrigger>
@@ -739,7 +976,7 @@ export default function AdminClientManage() {
               </Card>
             </TabsContent>
 
-            {/* Users (REAL data) */}
+            {/* Users */}
             <TabsContent value="users" className="space-y-6">
               <Card>
                 <CardHeader>
@@ -747,7 +984,6 @@ export default function AdminClientManage() {
                   <CardDescription>Manage users who have access to this client</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Add user form (пока заглушка) */}
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="userEmail">Add User by Email</Label>
@@ -832,7 +1068,7 @@ export default function AdminClientManage() {
                       <Input value={client?.apiKey || ""} readOnly className="font-mono text-sm" />
                       <Button
                         variant="outline"
-                        onClick={() => client?.apiKey && copyToClipboard(client.apiKey)}
+                        onClick={() => client?.apiKey && copyToClipboard(client.apiKey!)}
                         disabled={!client?.apiKey}
                       >
                         <Copy className="w-4 h-4" />
@@ -889,9 +1125,15 @@ export default function AdminClientManage() {
                     className="border border-gray-800 rounded-lg overflow-hidden"
                     style={{ height: "600px", backgroundColor: "#1a1a1a" }}
                   >
-                    <iframe src={`/demo/${client?.slug || ""}`} className="w-full h-full" title="Widget Demo" />
+                    <iframe
+                      ref={previewRef}
+                      title="Widget Demo"
+                      src="about:blank"
+                      className="w-full h-full"
+                      onLoad={injectPreview}
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-popups-to-escape-sandbox"
+                    />
                   </div>
-                  <p className="text-xs text-gray-400 mt-3">This is how your widget will appear to visitors.</p>
                 </CardContent>
               </Card>
             </TabsContent>
