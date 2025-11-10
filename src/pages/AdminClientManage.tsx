@@ -1,5 +1,5 @@
 // src/pages/AdminClientManage.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -19,16 +19,30 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+
+const TOAST_SUCCESS = {
+  style: { background: "#303036", color: "#ffffff", border: "1px solid #14532d" },
+};
+const TOAST_WARNING = {
+  style: { background: "#303036", color: "#ed0e0eff", border: "1px solid #14532d" },
+};
 
 const PUBLIC_API_ROOT = "https://cloudcompliance.duckdns.org/api";
 
-// ===== Documents API helpers (подправь пути, если у тебя иные роуты) =====
+// ===== Documents API helpers =====
 const DOCS_API = {
   list:     (id: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents`,
   upload:   (id: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents`,
   download: (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/download`,
   text:     (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/text`,
   remove:   (id: string, docId: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}`,
+};
+
+// ===== Widget Config API helpers =====
+const WIDGET_CFG_API = {
+  get: (idOrSlug: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(idOrSlug)}/widget-config`,
+  put: (idOrSlug: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(idOrSlug)}/widget-config`,
 };
 
 // ===== Types =====
@@ -107,7 +121,7 @@ export default function AdminClientManage() {
   const [usersError, setUsersError] = useState<string | null>(null);
   const [clientUsers, setClientUsers] = useState<UserDTO[]>([]);
 
-  // ===== Widget settings UI (from client.config) =====
+  // ===== Widget settings UI (from WidgetConfig) =====
   const [settings, setSettings] = useState({
     widget_title: "AI Assistant",
     welcome_message: "Hi! How can I help you today?",
@@ -115,7 +129,7 @@ export default function AdminClientManage() {
     background_color: "#0f0f0f",
     text_color: "#ffffff",
     border_color: "#2927ea",
-    logo_url: null as string | null,
+    logo_url: null as string | null, // хранит logoUrl (с бэка) или base64 превью
     system_prompt: DEFAULT_SYSTEM_PROMPT,
   });
 
@@ -144,13 +158,14 @@ export default function AdminClientManage() {
 </script>
 <script src="${window.location.origin}/widget-embed.js"></script>`;
 
-  // ===== Fetch client by :clientId (id or slug) =====
+  // ===== Fetch client by :clientId (id or slug) + WidgetConfig =====
   useEffect(() => {
     let alive = true;
     (async () => {
       setLoading(true);
       setError(null);
       try {
+        // 1) тянем клиента
         const res = await fetch(`${PUBLIC_API_ROOT}/clients/${encodeURIComponent(clientId || "")}`, {
           credentials: "omit",
         });
@@ -160,21 +175,28 @@ export default function AdminClientManage() {
 
         setClient(data);
 
-        const cfg = data.config || {};
-        setSettings({
-          widget_title: cfg.widgetTitle ?? "AI Assistant",
-          welcome_message: cfg.welcomeMessage ?? "Hi! How can I help you today?",
-          primary_color: cfg.primaryColor ?? "#2927ea",
-          background_color: cfg.backgroundColor ?? "#0f0f0f",
-          text_color: cfg.textColor ?? "#ffffff",
-          border_color: cfg.borderColor ?? "#2927ea",
-          logo_url: cfg.logoUrl ?? null,
-          system_prompt:
-            cfg.systemPrompt && cfg.systemPrompt.trim().length
-              ? cfg.systemPrompt
-              : DEFAULT_SYSTEM_PROMPT,
-        });
-        setLogoPreview(null);
+        // 2) тянем конфиг виджета
+        if (clientId) {
+          const cfgRes = await fetch(WIDGET_CFG_API.get(clientId), { credentials: "omit" });
+          if (cfgRes.ok) {
+            const { config } = await cfgRes.json();
+            const cfg = config || {};
+            setSettings({
+              widget_title:     cfg.widgetTitle      ?? "AI Assistant",
+              welcome_message:  cfg.welcomeMessage   ?? "Hi! How can I help you today?",
+              primary_color:    cfg.primaryColor     ?? "#2927ea",
+              background_color: cfg.backgroundColor  ?? "#0f0f0f",
+              text_color:       cfg.textColor        ?? "#ffffff",
+              border_color:     cfg.borderColor      ?? "#2927ea",
+              logo_url:         cfg.logoUrl ?? null,
+              system_prompt:
+                (cfg?.customSystemPrompt && String(cfg.customSystemPrompt).trim().length
+                  ? cfg.customSystemPrompt
+                  : DEFAULT_SYSTEM_PROMPT),
+            });
+            setLogoPreview(null);
+          }
+        }
       } catch (e: any) {
         if (!alive) return;
         setError(e?.message || "Failed to load client");
@@ -247,7 +269,7 @@ export default function AdminClientManage() {
 
   useEffect(() => {
     fetchDocuments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
   // ===== Upload handlers =====
@@ -275,7 +297,6 @@ export default function AdminClientManage() {
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", DOCS_API.upload(clientId), true);
-        // Если нужна авторизация JWT:
         // xhr.setRequestHeader("Authorization", `Bearer ${getAccessToken()}`);
 
         xhr.upload.onprogress = (evt) => {
@@ -292,8 +313,10 @@ export default function AdminClientManage() {
       });
 
       await fetchDocuments();
+      toast.success("Uploaded", { description: "Document has been uploaded.", ...TOAST_SUCCESS });
     } catch (e: any) {
       setUploadError(e?.message || "Upload failed");
+      toast.warning("Upload failed", { description: e?.message || "Try again later.", ...TOAST_WARNING });
     } finally {
       setUploading(false);
       setUploadProgress(null);
@@ -338,71 +361,73 @@ export default function AdminClientManage() {
     window.open(url, "_blank");
   }
 
-async function handleDeleteDocument(doc: DocDTO) {
-  if (!clientId) {
-    alert("ClientId is missing in route.");
-    return;
+  async function handleDeleteDocument(doc: DocDTO) {
+    if (!clientId) {
+      alert("ClientId is missing in route.");
+      return;
+    }
+    if (!confirm(`Delete "${doc.fileName}"?`)) return;
+
+    try {
+      const res = await fetch(DOCS_API.remove(clientId, doc._id), {
+        method: "DELETE",
+        credentials: "omit",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await fetchDocuments();
+      toast.success("Deleted", { description: "Document has been removed.", ...TOAST_SUCCESS });
+    } catch (e: any) {
+      toast.warning("Delete failed", { description: e?.message || "Try again later.", ...TOAST_WARNING });
+      alert(e?.message || "Failed to delete");
+    }
   }
-  if (!confirm(`Delete "${doc.fileName}"?`)) return;
 
-  try {
-    const res = await fetch(DOCS_API.remove(clientId, doc._id), {
-      method: "DELETE",
-      credentials: "omit",
-    });
-    if (!res.ok) throw new Error(await res.text());
-    await fetchDocuments();
-  } catch (e: any) {
-    alert(e?.message || "Failed to delete");
-  }
-}
-
-
-  // ===== Save (PATCH /clients/:slug) — partial config update =====
+  // ===== Save (PUT /clients/:idOrSlug/widget-config) — upsert WidgetConfig =====
   const handleSaveSettings = async () => {
-    if (!client) return;
+    if (!clientId) return;
     setSaving(true);
     setError(null);
     try {
       const payload = {
-        config: {
-          widgetTitle: settings.widget_title,
-          welcomeMessage: settings.welcome_message,
-          primaryColor: settings.primary_color,
-          backgroundColor: settings.background_color,
-          textColor: settings.text_color,
-          borderColor: settings.border_color,
-          logoUrl: logoPreview ?? settings.logo_url ?? null,
-          systemPrompt: settings.system_prompt,
-        },
+        widgetTitle:        settings.widget_title,
+        welcomeMessage:     settings.welcome_message,
+        primaryColor:       settings.primary_color,
+        backgroundColor:    settings.background_color,
+        textColor:          settings.text_color,
+        borderColor:        settings.border_color,
+        customSystemPrompt: settings.system_prompt,
+        logoUrl:            logoPreview ?? settings.logo_url ?? null,
+        isActive:           true,
       };
-      const res = await fetch(`${PUBLIC_API_ROOT}/clients/${encodeURIComponent(client.slug)}`, {
-        method: "PATCH",
+      const res = await fetch(WIDGET_CFG_API.put(clientId), {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "omit",
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(await res.text());
-      const updated = (await res.json()) as ClientDTO;
-      setClient(updated);
+      const { config } = await res.json();
 
-      const cfg = updated.config || {};
-      setSettings({
-        widget_title: cfg.widgetTitle ?? settings.widget_title,
-        welcome_message: cfg.welcomeMessage ?? settings.welcome_message,
-        primary_color: cfg.primaryColor ?? settings.primary_color,
-        background_color: cfg.backgroundColor ?? settings.background_color,
-        text_color: cfg.textColor ?? settings.text_color,
-        border_color: cfg.borderColor ?? settings.border_color,
-        logo_url: cfg.logoUrl ?? settings.logo_url,
+      setSettings((prev) => ({
+        ...prev,
+        widget_title:     config?.widgetTitle      ?? prev.widget_title,
+        welcome_message:  config?.welcomeMessage   ?? prev.welcome_message,
+        primary_color:    config?.primaryColor     ?? prev.primary_color,
+        background_color: config?.backgroundColor  ?? prev.background_color,
+        text_color:       config?.textColor        ?? prev.text_color,
+        border_color:     config?.borderColor      ?? prev.border_color,
+        logo_url:         config?.logoUrl ?? prev.logo_url,
         system_prompt:
-          cfg.systemPrompt && cfg.systemPrompt.trim().length
-            ? cfg.systemPrompt
-            : settings.system_prompt,
-      });
+          (config?.customSystemPrompt && String(config.customSystemPrompt).trim().length
+            ? config.customSystemPrompt
+            : prev.system_prompt),
+      }));
       setLogoPreview(null);
+
+      toast.success("Saved", { description: "Widget settings were updated successfully.", ...TOAST_SUCCESS });
     } catch (e: any) {
       setError(e?.message || "Failed to save settings");
+      toast.warning("Save failed", { description: e?.message || "Please try again.", ...TOAST_WARNING });
     } finally {
       setSaving(false);
     }
@@ -411,6 +436,7 @@ async function handleDeleteDocument(doc: DocDTO) {
   // ===== Render =====
   return (
     <div className="min-h-screen bg-background">
+
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-6 py-4">
