@@ -1224,9 +1224,7 @@ const handleSaveSettings = async () => {
                 <div class="title" id="title"></div>
               </div>
               <div class="body">
-                <div class="messages" id="messages">
-                  <div class="row ai"><div class="bubble" id="welcome"></div></div>
-                </div>
+<div class="messages" id="messages"></div>
 <div class="composer">
   <form id="composer-form" class="form">
    <div class="field">
@@ -1254,93 +1252,101 @@ const handleSaveSettings = async () => {
     const style = doc.createElement("style");
     style.textContent = `
       :root { color-scheme: dark; }
-      html,body { height:100%; margin:0; background:#0a0a0a; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+html,body { height:100%; margin:0; background:#0a0a0a; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
 
-      .host { height:100%; width:100%; display:flex; }
-      .card {
-        flex:1; display:flex; flex-direction:column;
-        background: var(--bg, #111);
-        border: 1px solid rgba(255,255,255,.06);
-        border-radius: 10px;
-      }
-      .body, .messages { background: var(--bg, #111); }
-      .body { min-height: 0; }
-      .head {
-        padding:12px 16px; display:flex; align-items:center; gap:10px;
-        border-bottom:1px solid rgba(255,255,255,.07);
-        background: var(--pill, #2b2f36);
-      }
-      .title { font-weight:700; font-size:14px; color:#ffffff; }
-      .logo  { width:28px; height:28px; border-radius:8px; background:#222; object-fit:contain; }
+.host { height:100%; width:100%; display:flex; }
+.card {
+  flex:1; display:flex; flex-direction:column;
+  background: var(--bg, #0d0f12);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 10px;
+}
+/* header */
+.head{
+  padding:12px 16px; display:flex; align-items:center; gap:10px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  background:#101215;
+}
+.title { font-weight:700; font-size:14px; color:#fff; }
+.logo  { width:28px; height:28px; border-radius:8px; background:#222; object-fit:contain; }
 
-      .body { flex:1; padding:16px; display:flex; flex-direction:column; gap:10px; }
-      .messages { flex:1; overflow:auto; display:flex; flex-direction:column; gap:8px; }
-      .messages::-webkit-scrollbar { width: 8px; }
-      .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 8px; }
-      .messages::-webkit-scrollbar-track { background: transparent; }
-      .row { display:flex; }
-      .me { justify-content:flex-end; }
-      .bubble {
-        padding:10px 12px; border-radius:14px; max-width:85%;
-        white-space:pre-wrap; word-break:break-word; line-height:1.5;
-        border:1px solid transparent;
-        box-shadow: 0 1px 0 rgba(0,0,0,.2);
-        color:#fff;
-        background: var(--pill, #2b2f36);
-      }
-      .me .bubble { background: var(--pill, #2b2f36); color:#fff; }
-      .ai .bubble { background: rgba(255,255,255,.06); color:#e5e7eb; border-color:rgba(255,255,255,.08); }
+/* layout */
+.body{ flex:1; min-height:0; display:flex; flex-direction:column; background:#0d0f12; }
+.messages{
+  flex:1; padding:16px 20px; overflow:auto; display:flex; flex-direction:column; gap:14px;
+}
+.messages::-webkit-scrollbar{ width:8px; }
+.messages::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.15); border-radius:8px; }
+.messages::-webkit-scrollbar-track{ background:transparent; }
 
-      .typing .bubble { display:inline-flex; align-items:center; gap:6px; min-height:18px; }
-      .dot { width:6px; height:6px; border-radius:50%; background: currentColor; opacity:.4; animation: blink 1.2s infinite; }
-      .dot:nth-child(2) { animation-delay:.2s; }
-      .dot:nth-child(3) { animation-delay:.4s; }
-      @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+/* message row with avatar */
+.row{ display:flex; align-items:flex-end; gap:10px; }
+.row.me{ justify-content:flex-end; }
+.row.me .avatar{ order:2; }
+.row.me .bubble{ order:1; }
 
-    /* базовая сетка, чтобы не «плыло» */
-*, *::before, *::after { box-sizing: border-box; }
+/* avatar */
+.avatar{
+  width:28px; height:28px; border-radius:50%;
+  background:#1e2228; border:2px solid rgba(255,255,255,.9);
+  flex:0 0 28px; overflow:hidden; position:relative;
+}
+.avatar img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 
-/* === Composer (новый футер) === */
+/* bubble + meta */
+.bubble{
+  max-width:78%;
+  background:#22252b; /* ассистент по умолчанию */
+  color:#fff;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:10px 12px;
+  line-height:1.5; word-break:break-word; white-space:pre-wrap;
+  box-shadow:0 1px 0 rgba(0,0,0,.25);
+}
+.row.me .bubble{
+  background:#2b2f36; color:#fff; border-color:transparent;
+}
+.meta{
+  margin-top:4px; font-size:11px; color:rgba(235,239,245,.65);
+}
+
+/* typing state */
+.typing .bubble{
+  display:inline-flex; align-items:center; gap:6px; min-height:18px;
+}
+.dot{ width:6px; height:6px; border-radius:50%; background: currentColor; opacity:.4; animation: blink 1.2s infinite; }
+.dot:nth-child(2){ animation-delay:.2s; }
+.dot:nth-child(3){ animation-delay:.4s; }
+@keyframes blink{ 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+
+/* === Composer (footer) === */
 .composer { padding:16px 20px; border-top:1px solid rgba(255,255,255,.08); background:#0b0c0f; }
 .form{ max-width:1100px; margin:0 auto; }
-.form .field{ position:relative; isolation:isolate; } /* кнопка центрируется по высоте поля */
+.form .field{ position:relative; isolation:isolate; }
 .form textarea{
-  display:block;
-  width:100%;
-  min-height:56px;
-  resize:vertical;
-  background:#1b1c20;
-  color:#e5e7eb;
-  border:1px solid #2f3136;
-  border-radius:16px;
-  padding:12px 80px 12px 12px; /* запас справа под кнопку + иконки расширений */
-  outline:none;
-  line-height:1.4; font-size:14px; font-family:inherit; caret-color:#fff;
+  display:block; width:100%; min-height:56px; resize:vertical;
+  background:#16191e; color:#e9edf3;
+  border:1px solid #2f3136; border-radius:16px;
+  padding:12px 80px 12px 12px;
+  outline:none; line-height:1.4; font-size:14px; font-family:inherit; caret-color:#fff;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.03), 0 1px 2px rgba(0,0,0,.4);
   box-sizing:border-box;
 }
 .form textarea::placeholder{ color:rgba(229,231,235,.55); }
-
 .form button#send{
-  position:absolute;
-  right:12px;
-  top:50%; transform:translateY(-50%);
-  height:40px; width:40px;
-  border:none; border-radius:9999px;
-  background:var(--pill,#2b2f36); color:#fff; cursor:pointer;
+  position:absolute; right:12px; top:50%; transform:translateY(-50%);
+  height:40px; width:40px; border:none; border-radius:9999px;
+  background:#2b2f36; color:#fff; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center;
-  box-shadow:0 2px 6px rgba(0,0,0,.35);
-  z-index:2; /* поверх значков Grammarly и т.п. */
+  box-shadow:0 2px 6px rgba(0,0,0,.35); z-index:2;
 }
 .form button#send svg path{ fill:currentColor; }
 .form button#send:disabled{ opacity:.6; cursor:default; }
-
-.form .info{
-  margin-top:8px; display:flex; align-items:center; justify-content:space-between;
-  gap:12px; font-size:12px; color:rgba(229,231,235,.55);
-}
+.form .info{ margin-top:8px; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:12px; color:rgba(229,231,235,.55); }
 .form .hint{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .form .counter{ white-space:nowrap; }
+
     `;
     (doc.head || doc.getElementsByTagName("head")[0]).appendChild(style);
 
@@ -1348,18 +1354,36 @@ const handleSaveSettings = async () => {
     script.type = "text/javascript";
     script.textContent = `
       (function () {
-        var cfg = {
-          title: ${JSON.stringify(settings.widget_title)},
-          welcome: ${JSON.stringify(settings.welcome_message)},
-          pColor: ${JSON.stringify(settings.primary_color)},
-          bgColor: ${JSON.stringify(settings.background_color)},
-          tColor: ${JSON.stringify(settings.text_color)},
-          bColor: ${JSON.stringify(settings.border_color || settings.primary_color)},
-          logo: ${JSON.stringify(settings.logo_url)},
-          siteId: ${JSON.stringify(settings.site_id || client?.siteId || "")},
-          clientId: ${JSON.stringify(client?._id || "")},
-          endpoint: "https://cloudcompliance.duckdns.org/api/aiw/chat"
-        };
+    var cfg = {
+      title: ${JSON.stringify(settings.widget_title)},
+      welcome: ${JSON.stringify(settings.welcome_message)},
+      pColor: ${JSON.stringify(settings.primary_color)},
+      bgColor: ${JSON.stringify(settings.background_color)},
+      tColor: ${JSON.stringify(settings.text_color)},
+      bColor: ${JSON.stringify(settings.border_color || settings.primary_color)},
+      logo: ${JSON.stringify(settings.logo_url)},
+      siteId: ${JSON.stringify(settings.site_id || client?.siteId || "")},
+      clientId: ${JSON.stringify(client?._id || "")},
+      endpoint: "https://cloudcompliance.duckdns.org/api/aiw/chat"
+    };
+
+    // --- NEW: простейший storage для visitor/session в превью ---
+    var NS = 'aiw-preview:' + (cfg.siteId || cfg.clientId || 'default');
+    function load(k){ try { return JSON.parse(localStorage.getItem(NS+':'+k) || 'null'); } catch(_) { return null; } }
+    function save(k,v){ try { localStorage.setItem(NS+':'+k, JSON.stringify(v)); } catch(_) {} }
+
+    var visitorId = load('visitorId');
+    if (!visitorId) { visitorId = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36); save('visitorId', visitorId); }
+
+    var session = load('session');
+    if (!session) { session = { id: 's_' + Math.random().toString(36).slice(2), startedAt: Date.now() }; save('session', session); }
+
+    // (опционально) если нужно рвать сессию по таймауту простоя:
+    var SESSION_TTL_MS = 30 * 60 * 1000; // 30 минут
+    if (Date.now() - (session.startedAt || 0) > SESSION_TTL_MS) {
+      session = { id: 's_' + Math.random().toString(36).slice(2), startedAt: Date.now() };
+      save('session', session);
+    }
 
         var root = document.getElementById('widget');
         root.style.setProperty('--bg', cfg.bgColor);
@@ -1376,12 +1400,13 @@ const handleSaveSettings = async () => {
         } else {
           logoEl.style.background = cfg.pColor;
         }
-        document.getElementById('welcome').textContent = cfg.welcome;
 
         var messages = document.getElementById('messages');
         var inp = document.getElementById('inp');
         var btn = document.getElementById('send');
         var form = document.getElementById('composer-form');
+        append('assistant', cfg.welcome);
+
 var counter = document.getElementById('counter');
 var MAX = 1000;
 function updateCounter() {
@@ -1395,24 +1420,60 @@ inp.addEventListener('input', function () {
 updateCounter();
         function scrollToBottom(){ messages.scrollTop = messages.scrollHeight; }
 
-        function append(role, text) {
-          var row = document.createElement('div');
-          row.className = 'row ' + (role === 'user' ? 'me' : 'ai');
-          var bubble = document.createElement('div');
-          bubble.className = 'bubble';
-          if (role === 'user') { bubble.style.background = '#2b2f36'; bubble.style.color = '#fff'; bubble.style.borderColor='transparent'; }
-          else { bubble.style.background='rgba(255,255,255,.06)'; bubble.style.color='#e5e7eb'; bubble.style.borderColor='rgba(255,255,255,.08)'; }
-          bubble.textContent = text || '';
-          row.appendChild(bubble); messages.appendChild(row); scrollToBottom();
-          return bubble;
-        }
+function formatTime(d){ 
+  try{ return new Date(d || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+  catch{ return ''; }
+}
 
-        function showTyping(){
-          var row = document.createElement('div'); row.className='row ai typing';
-          var bubble = document.createElement('div'); bubble.className='bubble'; bubble.style.color='#e5e7eb';
-          for (var i=0;i<3;i++){ var d=document.createElement('span'); d.className='dot'; bubble.appendChild(d); }
-          row.appendChild(bubble); messages.appendChild(row); scrollToBottom(); return row;
-        }
+function makeAvatar(role){
+  var a = document.createElement('div');
+  a.className = 'avatar';
+  if (role === 'assistant' && cfg.logo){
+    var img = document.createElement('img');
+    img.src = cfg.logo; img.alt = 'assistant';
+    a.appendChild(img);
+  }
+  return a;
+}
+
+function append(role, text){
+  var row = document.createElement('div');
+  row.className = 'row ' + (role === 'user' ? 'me' : 'ai');
+
+  // avatar
+  row.appendChild(makeAvatar(role));
+
+  // bubble + meta
+  var wrap = document.createElement('div');
+  var bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  var meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = formatTime(Date.now());
+
+  bubble.textContent = text || '';
+  wrap.appendChild(bubble);
+  wrap.appendChild(meta);
+
+  row.appendChild(wrap);
+  messages.appendChild(row);
+  scrollToBottom();
+  return { row: row, bubble: bubble, meta: meta };
+}
+
+function showTyping(){
+  var row = document.createElement('div');
+  row.className='row ai typing';
+  row.appendChild(makeAvatar('assistant'));
+  var wrap = document.createElement('div');
+  var bubble = document.createElement('div'); bubble.className='bubble';
+  for (var i=0;i<3;i++){ var d=document.createElement('span'); d.className='dot'; bubble.appendChild(d); }
+  wrap.appendChild(bubble);
+  row.appendChild(wrap);
+  messages.appendChild(row);
+  scrollToBottom();
+  return row;
+}
 
         async function sendMessage(){
           var text = (inp.value || '').trim(); if (!text) return;
@@ -1424,7 +1485,16 @@ updateCounter();
               method: 'POST',
               mode: 'cors',
               headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream, application/json' },
-              body: JSON.stringify({ messages: [{ role: 'user', content: text }], siteId: cfg.siteId || null, clientId: cfg.clientId || null, source: 'admin-preview', stream: false })
+              body: JSON.stringify({
+  messages: [{ role: 'user', content: text }],
+  siteId: cfg.siteId || null,
+  clientId: cfg.clientId || null,
+  source: 'admin-preview',
+  stream: false,
+  // --- NEW: держим связность сессии в демо ---
+  sessionId: session.id,
+  visitorId: visitorId
+})
             });
 
             if (!res.ok) {
@@ -1450,6 +1520,12 @@ updateCounter();
                 }
               } else {
                 const data = await res.json().catch(()=> ({}));
+              var sid = (data && (data.sessionId || (data.session && data.session.id))) || null;
+if (sid && sid !== session.id) {
+  session.id = sid;
+  session.startedAt = Date.now();
+  save('session', session);
+}
                 const msg = data.reply || data.answer || data.message || data.text ||
                   (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || 'No response';
                 typingBubble.textContent = String(msg);
@@ -1457,9 +1533,16 @@ updateCounter();
             }
           } catch (e) {
             typingBubble.textContent = 'Network error: ' + (e && e.message ? e.message : 'request failed');
-          } finally {
-            typingRow.classList.remove('typing'); btn.disabled = false; scrollToBottom();
-          }
+} finally {
+  // превращаем typing в обычный ассистентский bubble с таймстампом
+  try{
+    typingRow.classList.remove('typing');
+    var meta = document.createElement('div'); meta.className = 'meta';
+    meta.textContent = formatTime(Date.now());
+    typingRow.lastElementChild.appendChild(meta); // добавить под bubble
+  }catch(e){}
+  btn.disabled = false; scrollToBottom();
+}
         }
 
         btn.addEventListener('click', sendMessage);
