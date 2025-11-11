@@ -1,5 +1,5 @@
 // src/pages/AdminClientManage.tsx
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   ArrowLeft, Copy, Download, ExternalLink, Eye, Image as ImageIcon, Trash2, Upload, X,
-  AlertCircle,
+  AlertCircle, Search, RefreshCw, ChevronLeft, ChevronRight
 } from "lucide-react";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
@@ -30,6 +31,8 @@ const TOAST_WARNING = {
 
 const PUBLIC_API_ROOT = "https://cloudcompliance.duckdns.org/api";
 const API_ORIGIN = new URL(PUBLIC_API_ROOT).origin;
+// === NEW: Statistics base ===
+const STATS_API_ROOT = "https://cloudcompliance.duckdns.org/api/statistic";
 
 // ===== Documents API helpers =====
 const DOCS_API = {
@@ -63,6 +66,8 @@ type ClientDTO = {
     borderColor?: string;
     logoUrl?: string | null;
     systemPrompt?: string;
+    customSystemPrompt?: string;
+    siteId?: string;
   };
   stats?: { documents: number; users: number };
 };
@@ -105,6 +110,666 @@ type DocumentDialog = {
   content?: string;
 };
 
+/* =========================
+   Analytics helper types
+   ========================= */
+type TimeseriesRow = { ts: string; count?: number; total?: number; users?: number; assistants?: number; unresolved?: number; resolved?: number };
+
+type SessionsListItem = {
+  siteId: string; sessionId: string; visitorId: string;
+  pageUrl?: string; referrer?: string;
+  startedAt?: string; endedAt?: string;
+  messagesCount?: number; userMessages?: number; assistantMessages?: number;
+  topics?: string[]; lastUserQuestion?: string;
+};
+
+type MessagesListItem = {
+  siteId: string; sessionId: string;
+  role: "user" | "assistant" | "system";
+  content: string; topic?: string;
+  latencyMs?: number; promptTokens?: number; completionTokens?: number;
+  createdAt?: string;
+};
+
+type GapsListItem = {
+  siteId: string; sessionId?: string; clientId?: string;
+  question: string; normalizedQuestion?: string;
+  phase?: string; citations?: string[]; answerPreview?: string;
+  judge?: { goodAnswer?: boolean; confidence?: number; reason?: string };
+  lastSeenAt?: string; resolvedAt?: string; createdAt?: string;
+};
+
+/* =========================
+   Small UI helpers
+   ========================= */
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function humanId(s?: string, left = 6, right = 4) {
+  if (!s) return "—";
+  return s.length > left + right + 1 ? `${s.slice(0, left)}…${s.slice(-right)}` : s;
+}
+
+
+/* =========================
+   AnalyticsTab (NEW)
+   ========================= */
+function AnalyticsTab({ siteId }: { siteId?: string }) {
+  const [days, setDays] = useState<number>(30);
+  const [bucket, setBucket] = useState<"hour"|"day"|"week">("day");
+  const [tz, setTz] = useState<string>("UTC");
+
+  // Summary
+  const [loadingCards, setLoadingCards] = useState(false);
+  const [activeVisitors, setActiveVisitors] = useState<number>(0);
+  const [sessionsTotal, setSessionsTotal] = useState<number>(0);
+  const [messagesTotal, setMessagesTotal] = useState<number>(0);
+  const [gapsUnresolved, setGapsUnresolved] = useState<number>(0);
+
+  // Tables: pagination & search
+  const [q, setQ] = useState<string>("");
+  // Sessions
+  const [sessPage, setSessPage] = useState(1);
+  const [sessLimit, setSessLimit] = useState(10);
+  const [sessions, setSessions] = useState<SessionsListItem[]>([]);
+  const [sessionsTotalCount, setSessionsTotalCount] = useState(0);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+
+  // Messages
+  const [msgPage, setMsgPage] = useState(1);
+  const [msgLimit, setMsgLimit] = useState(10);
+  const [msgRole, setMsgRole] = useState<"" | "user" | "assistant">("");
+  const [messages, setMessages] = useState<MessagesListItem[]>([]);
+  const [messagesTotalCount, setMessagesTotalCount] = useState(0);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+
+  // Gaps
+  const [gapsPage, setGapsPage] = useState(1);
+  const [gapsLimit, setGapsLimit] = useState(10);
+  const [gapsOnlyUnresolved, setGapsOnlyUnresolved] = useState(true);
+  const [gapsPhase, setGapsPhase] = useState<string>("");
+  const [gaps, setGaps] = useState<GapsListItem[]>([]);
+  const [gapsTotalCount, setGapsTotalCount] = useState(0);
+  const [gapsLoading, setGapsLoading] = useState(false);
+
+  // 👇 ДОБАВЬ
+const [isSessDialogOpen, setIsSessDialogOpen] = useState(false);
+const [sessDialogSession, setSessDialogSession] = useState<SessionsListItem | null>(null);
+const [sessDialogLoading, setSessDialogLoading] = useState(false);
+const [sessDialogMsgs, setSessDialogMsgs] = useState<MessagesListItem[]>([]);
+
+
+async function openSessionDialog(s: SessionsListItem) {
+  if (!siteId) return;
+  setSessDialogSession(s);
+  setIsSessDialogOpen(true);
+  setSessDialogLoading(true);
+  try {
+    const url = new URL(`${STATS_API_ROOT}/messages/list`);
+    url.searchParams.set("days", String(days));
+    url.searchParams.set("siteId", siteId);
+    url.searchParams.set("sessionId", s.sessionId);
+    url.searchParams.set("page", "1");
+    url.searchParams.set("limit", "200"); // хватит для одного диалога
+    const res = await fetch(url.toString());
+    const data = res.ok ? await res.json() : { items: [] };
+    // сортируем по времени возрастания — так привычнее читать переписку
+    const items: MessagesListItem[] = Array.isArray(data.items) ? data.items : [];
+    items.sort((a, b) => (new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()));
+    setSessDialogMsgs(items);
+  } catch {
+    setSessDialogMsgs([]);
+  } finally {
+    setSessDialogLoading(false);
+  }
+}
+
+  const disabled = !siteId;
+
+  const qs = useMemo(() => new URLSearchParams({
+    days: String(days),
+    siteId: siteId || "",
+  }), [days, siteId]);
+
+  async function loadCards() {
+    if (!siteId) return;
+    setLoadingCards(true);
+    try {
+      // 1) Active visitors (unique)
+      const a = await fetch(`${STATS_API_ROOT}/sessions/active/count?${qs.toString()}&uniqueBy=visitor`);
+      const aJson = a.ok ? await a.json() : { total: 0 };
+
+      // 2) Sessions count (raw)
+      const b = await fetch(`${STATS_API_ROOT}/sessions/count?${qs.toString()}`);
+      const bJson = b.ok ? await b.json() : { total: 0 };
+
+      // 3) Messages summary
+      const c = await fetch(`${STATS_API_ROOT}/messages/summary?${qs.toString()}`);
+      const cJson = c.ok ? await c.json() : { totals: { totalMessages: 0 } };
+
+      // 4) Gaps summary (unresolved)
+      const d = await fetch(`${STATS_API_ROOT}/gaps/summary?${qs.toString()}`);
+      const dJson = d.ok ? await d.json() : { totals: { unresolved: 0 } };
+
+      setActiveVisitors(Number(aJson?.total || 0));
+      setSessionsTotal(Number(bJson?.total || 0));
+      setMessagesTotal(Number(cJson?.totals?.totalMessages || 0));
+      setGapsUnresolved(Number(dJson?.totals?.unresolved || 0));
+    } catch {
+      // no-op
+    } finally {
+      setLoadingCards(false);
+    }
+  }
+
+  async function loadSessions() {
+    if (!siteId) return;
+    setSessionsLoading(true);
+    try {
+      const url = new URL(`${STATS_API_ROOT}/sessions/list`);
+      url.searchParams.set("days", String(days));
+      url.searchParams.set("siteId", siteId);
+      url.searchParams.set("page", String(sessPage));
+      url.searchParams.set("limit", String(sessLimit));
+
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setSessions(Array.isArray(data?.items) ? data.items : []);
+      setSessionsTotalCount(Number(data?.total || 0));
+    } catch (e) {
+      setSessions([]);
+      setSessionsTotalCount(0);
+    } finally {
+      setSessionsLoading(false);
+    }
+  }
+
+  async function loadMessages() {
+    if (!siteId) return;
+    setMessagesLoading(true);
+    try {
+      const url = new URL(`${STATS_API_ROOT}/messages/list`);
+      url.searchParams.set("days", String(days));
+      url.searchParams.set("siteId", siteId);
+      url.searchParams.set("page", String(msgPage));
+      url.searchParams.set("limit", String(msgLimit));
+      if (msgRole) url.searchParams.set("role", msgRole);
+      if (q.trim()) url.searchParams.set("q", q.trim());
+
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setMessages(Array.isArray(data?.items) ? data.items : []);
+      setMessagesTotalCount(Number(data?.total || 0));
+    } catch {
+      setMessages([]);
+      setMessagesTotalCount(0);
+    } finally {
+      setMessagesLoading(false);
+    }
+  }
+
+  async function loadGaps() {
+    if (!siteId) return;
+    setGapsLoading(true);
+    try {
+      const url = new URL(`${STATS_API_ROOT}/gaps/list`);
+      url.searchParams.set("days", String(days));
+      url.searchParams.set("siteId", siteId);
+      url.searchParams.set("page", String(gapsPage));
+      url.searchParams.set("limit", String(gapsLimit));
+      if (gapsOnlyUnresolved) url.searchParams.set("unresolvedOnly", "true");
+      if (gapsPhase) url.searchParams.set("phase", gapsPhase);
+      if (q.trim()) url.searchParams.set("q", q.trim());
+
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setGaps(Array.isArray(data?.items) ? data.items : []);
+      setGapsTotalCount(Number(data?.total || 0));
+    } catch {
+      setGaps([]);
+      setGapsTotalCount(0);
+    } finally {
+      setGapsLoading(false);
+    }
+  }
+
+  // Initial & on filters change
+  useEffect(() => { if (!disabled) loadCards(); /* eslint-disable-next-line */ }, [disabled, days, siteId]);
+  useEffect(() => { if (!disabled) loadSessions(); /* eslint-disable-next-line */ }, [disabled, days, siteId, sessPage, sessLimit]);
+  useEffect(() => { if (!disabled) loadMessages(); /* eslint-disable-next-line */ }, [disabled, days, siteId, msgPage, msgLimit, msgRole, q]);
+  useEffect(() => { if (!disabled) loadGaps(); /* eslint-disable-next-line */ }, [disabled, days, siteId, gapsPage, gapsLimit, gapsOnlyUnresolved, gapsPhase, q]);
+
+  const totalSessPages = Math.max(1, Math.ceil(sessionsTotalCount / sessLimit));
+  const totalMsgPages  = Math.max(1, Math.ceil(messagesTotalCount / msgLimit));
+  const totalGapPages  = Math.max(1, Math.ceil(gapsTotalCount / gapsLimit));
+
+  return (
+    <div className="space-y-6">
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+          <CardDescription>Scope analytics using siteId, window and timezone</CardDescription>
+        </CardHeader>
+        <CardContent className="grid md:grid-cols-5 gap-4">
+          <Field label="Site ID">
+            <Input value={siteId || ""} readOnly className="font-mono text-xs" />
+          </Field>
+          <Field label="Days">
+            <Input
+              type="number"
+              min={1}
+              max={365}
+              value={days}
+              onChange={(e) => setDays(Math.max(1, Number(e.target.value || 30)))}
+            />
+          </Field>
+          <Field label="Bucket">
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={bucket}
+              onChange={(e) => setBucket(e.target.value as any)}
+            >
+              <option value="hour">hour</option>
+              <option value="day">day</option>
+              <option value="week">week</option>
+            </select>
+          </Field>
+          <Field label="Timezone">
+            <Input value={tz} onChange={(e) => setTz(e.target.value)} placeholder="UTC or IANA (e.g., Europe/Warsaw)" />
+          </Field>
+          <Field label="Search (Messages/Gaps)">
+            <div className="flex gap-2">
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search text…" />
+              <Button variant="outline" onClick={() => { setQ(q.trim()); }}>
+                <Search className="w-4 h-4" />
+              </Button>
+            </div>
+          </Field>
+          {!siteId && (
+            <div className="md:col-span-5 p-3 border border-yellow-500/40 bg-yellow-500/10 rounded text-sm text-yellow-200">
+              To see analytics, set <span className="font-mono">siteId</span> in client’s widget config.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* KPI cards */}
+      <div className="grid md:grid-cols-4 gap-4">
+        {[{
+          title: "Active Visitors",
+          value: activeVisitors
+        }, {
+          title: "Sessions",
+          value: sessionsTotal
+        }, {
+          title: "Messages",
+          value: messagesTotal
+        }, {
+          title: "Unresolved Gaps",
+          value: gapsUnresolved
+        }].map((k, i) => (
+          <Card key={i}>
+            <CardHeader>
+              <CardTitle className="text-base">{k.title}</CardTitle>
+              <CardDescription>Last {days} days</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingCards ? <Skeleton className="h-8 w-24" /> : <div className="text-3xl font-bold">{k.value}</div>}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Sessions table */}
+      <Card>
+        <CardHeader className="flex items-start justify-between space-y-0">
+          <div>
+            <CardTitle>Sessions</CardTitle>
+            <CardDescription>Recent sessions for this site</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Field label="Per page">
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={sessLimit}
+                onChange={(e) => { setSessLimit(Number(e.target.value)); setSessPage(1); }}
+              >
+                {[10,20,50].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Field>
+            <Button variant="outline" onClick={loadSessions}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {sessionsLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No sessions found.</div>
+          ) : (
+            <>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left p-3 font-medium">Session</th>
+                      <th className="text-left p-3 font-medium">Visitor</th>
+                      <th className="text-left p-3 font-medium">Started</th>
+                      <th className="text-left p-3 font-medium">Msgs</th>
+                      <th className="text-left p-3 font-medium">Last Question</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sessions.map((s) => (
+                      <tr key={s.sessionId} className="border-t hover:bg-muted/40">
+<td className="p-3 font-mono text-xs">
+  <button
+    className="text-primary hover:underline"
+    title={s.sessionId}
+    onClick={() => openSessionDialog(s)}
+  >
+    {humanId(s.sessionId)}
+  </button>
+</td>
+<td className="p-3 font-mono text-xs" title={s.visitorId || ""}>
+  {humanId(s.visitorId)}
+</td>
+                        <td className="p-3 text-xs text-muted-foreground">
+                          {s.startedAt ? new Date(s.startedAt).toLocaleString() : "—"}
+                        </td>
+                        <td className="p-3 text-xs">
+                          {s.messagesCount ?? 0} <span className="text-muted-foreground">({s.userMessages ?? 0}/{s.assistantMessages ?? 0})</span>
+                        </td>
+                        <td className="p-3 text-xs">{s.lastUserQuestion ? (s.lastUserQuestion.length > 80 ? s.lastUserQuestion.slice(0,80) + "…" : s.lastUserQuestion) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              <div className="flex items-center justify-between mt-3">
+                <div className="text-xs text-muted-foreground">Total: {sessionsTotalCount}</div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled={sessPage<=1} onClick={()=>setSessPage(p=>Math.max(1,p-1))}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <div className="text-sm">Page {sessPage} / {totalSessPages}</div>
+                  <Button variant="outline" size="sm" disabled={sessPage>=totalSessPages} onClick={()=>setSessPage(p=>Math.min(totalSessPages,p+1))}>
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Messages table */}
+      <Card>
+        <CardHeader className="flex items-start justify-between space-y-0">
+          <div>
+            <CardTitle>Messages</CardTitle>
+            <CardDescription>All messages within the period</CardDescription>
+          </div>
+          <div className="flex items-end gap-3">
+            <Field label="Role">
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={msgRole}
+                onChange={(e)=>{ setMsgRole(e.target.value as any); setMsgPage(1); }}
+              >
+                <option value="">any</option>
+                <option value="user">user</option>
+                <option value="assistant">assistant</option>
+              </select>
+            </Field>
+            <Field label="Per page">
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={msgLimit}
+                onChange={(e)=>{ setMsgLimit(Number(e.target.value)); setMsgPage(1); }}
+              >
+                {[10,20,50].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Field>
+            <Button variant="outline" onClick={loadMessages}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {messagesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No messages found.</div>
+          ) : (
+            <>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left p-3 font-medium">Time</th>
+                      <th className="text-left p-3 font-medium">Session</th>
+                      <th className="text-left p-3 font-medium">Role</th>
+                      <th className="text-left p-3 font-medium">Content</th>
+                      <th className="text-left p-3 font-medium">Latency</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {messages.map((m, idx) => (
+                      <tr key={idx} className="border-t">
+                        <td className="p-3 text-xs text-muted-foreground">
+                          {m.createdAt ? new Date(m.createdAt).toLocaleString() : "—"}
+                        </td>
+                        <td className="p-3 font-mono text-xs">{m.sessionId}</td>
+                        <td className="p-3 text-xs">{m.role}</td>
+                        <td className="p-3 text-xs">
+                          {m.content ? (m.content.length > 120 ? m.content.slice(0,120) + "…" : m.content) : "—"}
+                        </td>
+                        <td className="p-3 text-xs">{typeof m.latencyMs === "number" ? `${m.latencyMs} ms` : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              <div className="flex items-center justify-between mt-3">
+                <div className="text-xs text-muted-foreground">Total: {messagesTotalCount}</div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled={msgPage<=1} onClick={()=>setMsgPage(p=>Math.max(1,p-1))}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <div className="text-sm">Page {msgPage} / {totalMsgPages}</div>
+                  <Button variant="outline" size="sm" disabled={msgPage>=totalMsgPages} onClick={()=>setMsgPage(p=>Math.min(totalMsgPages,p+1))}>
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Gaps table */}
+      <Card>
+        <CardHeader className="flex items-start justify-between space-y-0">
+          <div>
+            <CardTitle>Gaps</CardTitle>
+            <CardDescription>Unanswered/low-confidence questions</CardDescription>
+          </div>
+        <div className="flex items-end gap-3">
+            <Field label="Phase">
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={gapsPhase}
+                onChange={(e)=>{ setGapsPhase(e.target.value); setGapsPage(1); }}
+              >
+                <option value="">any</option>
+                <option value="no-context">no-context</option>
+                <option value="rag">rag</option>
+                <option value="rag-extractive">rag-extractive</option>
+              </select>
+            </Field>
+            <Field label="Unresolved only">
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={String(gapsOnlyUnresolved)}
+                onChange={(e)=>{ setGapsOnlyUnresolved(e.target.value === "true"); setGapsPage(1); }}
+              >
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </Field>
+            <Field label="Per page">
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={gapsLimit}
+                onChange={(e)=>{ setGapsLimit(Number(e.target.value)); setGapsPage(1); }}
+              >
+                {[10,20,50].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Field>
+            <Button variant="outline" onClick={loadGaps}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {gapsLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : gaps.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No gaps found.</div>
+          ) : (
+            <>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left p-3 font-medium">Question</th>
+                      <th className="text-left p-3 font-medium">Phase</th>
+                      <th className="text-left p-3 font-medium">Confidence</th>
+                      <th className="text-left p-3 font-medium">Last Seen</th>
+                      <th className="text-left p-3 font-medium">Resolved</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gaps.map((g, idx) => (
+                      <tr key={idx} className="border-t">
+                        <td className="p-3 text-xs">
+                          {g.question ? (g.question.length > 120 ? g.question.slice(0,120) + "…" : g.question) : "—"}
+                        </td>
+                        <td className="p-3 text-xs">{g.phase || "—"}</td>
+                        <td className="p-3 text-xs">
+                          {typeof g?.judge?.confidence === "number" ? g.judge.confidence.toFixed(2) : "—"}
+                        </td>
+                        <td className="p-3 text-xs text-muted-foreground">
+                          {g.lastSeenAt ? new Date(g.lastSeenAt).toLocaleString() : (g.createdAt ? new Date(g.createdAt).toLocaleString() : "—")}
+                        </td>
+                        <td className="p-3 text-xs">{g.resolvedAt ? new Date(g.resolvedAt).toLocaleString() : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              <div className="flex items-center justify-between mt-3">
+                <div className="text-xs text-muted-foreground">Total: {gapsTotalCount}</div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled={gapsPage<=1} onClick={()=>setGapsPage(p=>Math.max(1,p-1))}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <div className="text-sm">Page {gapsPage} / {totalGapPages}</div>
+                  <Button variant="outline" size="sm" disabled={gapsPage>=totalGapPages} onClick={()=>setGapsPage(p=>Math.min(totalGapPages,p+1))}>
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ⬇️ ВСТАВЬ ВОТ СЮДА: сразу после блока Gaps */}
+      {/* ===== Session Conversation Dialog ===== */}
+      <Dialog open={isSessDialogOpen} onOpenChange={setIsSessDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              Session {humanId(sessDialogSession?.sessionId)}{" "}
+              <span className="text-muted-foreground text-sm">
+                (Visitor {humanId(sessDialogSession?.visitorId)})
+              </span>
+            </DialogTitle>
+            <DialogDescription>
+              {sessDialogSession?.startedAt
+                ? `Started: ${new Date(sessDialogSession.startedAt).toLocaleString()}`
+                : "Conversation messages"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="border rounded-md max-h-[60vh] overflow-auto p-3 bg-muted/30">
+            {sessDialogLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-5/6" />
+                <Skeleton className="h-6 w-4/6" />
+              </div>
+            ) : sessDialogMsgs.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No messages in this session.</div>
+            ) : (
+              <ul className="space-y-3">
+                {sessDialogMsgs.map((m, i) => (
+                  <li key={i} className="flex gap-2">
+                    <div
+                      className={`px-2 py-1 rounded text-xs font-medium h-6 flex items-center ${
+                        m.role === "user"
+                          ? "bg-blue-500/20 text-blue-300"
+                          : m.role === "assistant"
+                          ? "bg-emerald-500/20 text-emerald-300"
+                          : "bg-zinc-500/20 text-zinc-200"
+                      }`}
+                      title={m.role}
+                    >
+                      {m.role}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-[11px] text-muted-foreground">
+                        {m.createdAt ? new Date(m.createdAt).toLocaleString() : "—"}
+                        {typeof m.latencyMs === "number" ? ` • ${m.latencyMs}ms` : ""}
+                        {typeof m.promptTokens === "number" || typeof m.completionTokens === "number"
+                          ? ` • tok ${m.promptTokens ?? 0}/${m.completionTokens ?? 0}`
+                          : ""}
+                      </div>
+                      <div className="text-sm whitespace-pre-wrap">{m.content || "—"}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* =========================
+   PAGE COMPONENT
+   ========================= */
 export default function AdminClientManage() {
   const navigate = useNavigate();
   const { clientId } = useParams<{ clientId: string }>();
@@ -126,17 +791,34 @@ export default function AdminClientManage() {
   >("setup");
 
   // ===== Widget settings UI (from WidgetConfig) =====
-  const [settings, setSettings] = useState({
-    widget_title: "AI Assistant",
-    welcome_message: "Hi! How can I help you today?",
-    primary_color: "#2927ea",
-    background_color: "#0f0f0f",
-    text_color: "#ffffff",
-    border_color: "#2927ea",
-    logo_url: null as string | null,
-    system_prompt: DEFAULT_SYSTEM_PROMPT,
-    site_id: "",
-  });
+const [settings, setSettings] = useState({
+  // базовые UI
+  widget_title: "AI Assistant",
+  welcome_message: "Hi! How can I help you today?",
+  primary_color: "#2927ea",
+  background_color: "#0f0f0f",
+  text_color: "#ffffff",
+  border_color: "#2927ea",
+  logo_url: null as string | null,
+
+  // поведение / метаданные
+  site_id: "",
+  lang: "en" as "en" | "ru" | string,
+  position: "br" as "br" | "bl",
+
+  autostart: false,
+  autostart_delay: 5000,
+  autostart_mode: "local" as "local" | "ai",
+  autostart_message: "",
+  autostart_prompt: "",
+  autostart_cooldown_hours: 12,
+
+  preserve_history: true,
+  reset_history_on_open: false,
+
+  // LLM
+  system_prompt: DEFAULT_SYSTEM_PROMPT,
+});
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
@@ -187,21 +869,41 @@ export default function AdminClientManage() {
           if (cfgRes.ok) {
             const { config } = await cfgRes.json();
             const cfg = config || {};
-            setSettings({
-              widget_title:     cfg.widgetTitle      ?? "AI Assistant",
-              welcome_message:  cfg.welcomeMessage   ?? "Hi! How can I help you today?",
-              primary_color:    cfg.primaryColor     ?? "#2927ea",
-              background_color: cfg.backgroundColor  ?? "#0f0f0f",
-              text_color:       cfg.textColor        ?? "#ffffff",
-              border_color:     cfg.borderColor      ?? "#2927ea",
-              logo_url:         cfg.logoUrl ?? null,
-              system_prompt:
-                (cfg?.customSystemPrompt && String(cfg.customSystemPrompt).trim().length
-                  ? cfg.customSystemPrompt
-                  : DEFAULT_SYSTEM_PROMPT),
-              site_id:          cfg.siteId ?? "",
-            });
+setSettings({
+  // UI
+  widget_title:     cfg.widgetTitle      ?? "AI Assistant",
+  welcome_message:  cfg.welcomeMessage   ?? "Hi! How can I help you today?",
+  primary_color:    cfg.primaryColor     ?? "#2927ea",
+  background_color: cfg.backgroundColor  ?? "#0f0f0f",
+  text_color:       cfg.textColor        ?? "#ffffff",
+  border_color:     (cfg.borderColor ?? cfg.primaryColor ?? "#2927ea"),
+  logo_url:         cfg.logoUrl ?? null,
+
+  // поведение / метаданные
+  site_id:          (cfg.siteId ?? data.siteId ?? ""),
+  lang:             (cfg.lang ?? "en"),
+  position:         (cfg.position ?? "br"),
+
+  autostart:                !!cfg.autostart,
+  autostart_delay:          typeof cfg.autostartDelay === "number" ? cfg.autostartDelay : 5000,
+  autostart_mode:           (cfg.autostartMode ?? "local"),
+  autostart_message:        (cfg.autostartMessage ?? ""),
+  autostart_prompt:         (cfg.autostartPrompt ?? ""),
+  autostart_cooldown_hours: typeof cfg.autostartCooldownHours === "number" ? cfg.autostartCooldownHours : 12,
+
+  preserve_history:         cfg.preserveHistory ?? true,
+  reset_history_on_open:    !!cfg.resetHistoryOnOpen,
+
+  // LLM
+  system_prompt:
+    (cfg?.customSystemPrompt && String(cfg.customSystemPrompt).trim().length
+      ? cfg.customSystemPrompt
+      : DEFAULT_SYSTEM_PROMPT),
+});
             setLogoPreview(null);
+          } else {
+            // если конфиг не найден — хотя бы скопировать client.siteId
+            setSettings((prev) => ({ ...prev, site_id: data.siteId || prev.site_id }));
           }
         }
       } catch (e: any) {
@@ -386,17 +1088,38 @@ export default function AdminClientManage() {
     setSaving(true);
     setError(null);
     try {
-      const payload: any = {
-        widgetTitle:        settings.widget_title,
-        welcomeMessage:     settings.welcome_message,
-        primaryColor:       settings.primary_color,
-        backgroundColor:    settings.background_color,
-        textColor:          settings.text_color,
-        borderColor:        settings.border_color,
-        customSystemPrompt: settings.system_prompt,
-        logoUrl:            logoPreview ?? settings.logo_url ?? null,
-        isActive:           true,
-      };
+const payload: any = {
+  // UI
+  widgetTitle:        settings.widget_title,
+  welcomeMessage:     settings.welcome_message,
+  primaryColor:       settings.primary_color,
+  borderColor:        (settings.border_color || settings.primary_color),
+  backgroundColor:    settings.background_color,
+  textColor:          settings.text_color,
+  logoUrl:            logoPreview ?? settings.logo_url ?? null,
+
+  // поведение / метаданные
+  siteId:             (settings.site_id || "").trim(),
+  lang:               settings.lang,
+  position:           settings.position,
+
+  autostart:              !!settings.autostart,
+  autostartDelay:         Number(settings.autostart_delay) || 0,
+  autostartMode:          settings.autostart_mode,
+  autostartMessage:       settings.autostart_message,
+  autostartPrompt:        settings.autostart_prompt,
+  autostartCooldownHours: Number(settings.autostart_cooldown_hours) || 0,
+
+  preserveHistory:        !!settings.preserve_history,
+  resetHistoryOnOpen:     !!settings.reset_history_on_open,
+
+  // LLM
+  customSystemPrompt:     settings.system_prompt,
+
+  // флаги
+  isActive:               true,
+};
+
       if (settings.site_id && settings.site_id.trim()) payload.siteId = settings.site_id.trim();
 
       const res = await fetch(WIDGET_CFG_API.put(clientId), {
@@ -442,7 +1165,6 @@ export default function AdminClientManage() {
     const doc = iframe.contentDocument || (iframe as any).ownerDocument;
     if (!doc) return;
 
-    // 1) Minimal shell (без <style> внутри)
     const shell = `
       <!doctype html>
       <html>
@@ -473,7 +1195,6 @@ export default function AdminClientManage() {
       </html>`;
     doc.open(); doc.write(shell); doc.close();
 
-    // 2) Styles as a node
     const style = doc.createElement("style");
     style.textContent = `
       :root { color-scheme: dark; }
@@ -486,71 +1207,63 @@ export default function AdminClientManage() {
         border: 1px solid rgba(255,255,255,.06);
         border-radius: 10px;
       }
-        .body, .messages { background: var(--bg, #111); }
-.body { min-height: 0; }          /* flex fix, чтобы scroll работал корректно */
-     .head {
-  padding:12px 16px; display:flex; align-items:center; gap:10px;
-  border-bottom:1px solid rgba(255,255,255,.07);
-  background: var(--pill, #2b2f36);   /* новый фон */
-}
-.title { font-weight:700; font-size:14px; color:#ffffff; } /* белый текст */
-.logo  { width:28px; height:28px; border-radius:8px; background:#222; object-fit:contain; }
+      .body, .messages { background: var(--bg, #111); }
+      .body { min-height: 0; }
+      .head {
+        padding:12px 16px; display:flex; align-items:center; gap:10px;
+        border-bottom:1px solid rgba(255,255,255,.07);
+        background: var(--pill, #2b2f36);
+      }
+      .title { font-weight:700; font-size:14px; color:#ffffff; }
+      .logo  { width:28px; height:28px; border-radius:8px; background:#222; object-fit:contain; }
 
       .body { flex:1; padding:16px; display:flex; flex-direction:column; gap:10px; }
       .messages { flex:1; overflow:auto; display:flex; flex-direction:column; gap:8px; }
       .messages::-webkit-scrollbar { width: 8px; }
-.messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 8px; }
-.messages::-webkit-scrollbar-track { background: transparent; }
+      .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 8px; }
+      .messages::-webkit-scrollbar-track { background: transparent; }
       .row { display:flex; }
       .me { justify-content:flex-end; }
-.bubble {
-  padding:10px 12px; border-radius:14px; max-width:85%;
-  white-space:pre-wrap; word-break:break-word; line-height:1.5;
-  border:1px solid transparent;
-  box-shadow: 0 1px 0 rgba(0,0,0,.2);
-  color:#fff;
-  background: var(--pill, #2b2f36); /* один и тот же стиль */
-}
-.me .bubble { background: var(--pill, #2b2f36); color:#fff; }
-.ai .bubble { background: var(--pill, #2b2f36); color:#fff; }
-      /* typing dots */
+      .bubble {
+        padding:10px 12px; border-radius:14px; max-width:85%;
+        white-space:pre-wrap; word-break:break-word; line-height:1.5;
+        border:1px solid transparent;
+        box-shadow: 0 1px 0 rgba(0,0,0,.2);
+        color:#fff;
+        background: var(--pill, #2b2f36);
+      }
+      .me .bubble { background: var(--pill, #2b2f36); color:#fff; }
+      .ai .bubble { background: rgba(255,255,255,.06); color:#e5e7eb; border-color:rgba(255,255,255,.08); }
+
       .typing .bubble { display:inline-flex; align-items:center; gap:6px; min-height:18px; }
       .dot { width:6px; height:6px; border-radius:50%; background: currentColor; opacity:.4; animation: blink 1.2s infinite; }
       .dot:nth-child(2) { animation-delay:.2s; }
       .dot:nth-child(3) { animation-delay:.4s; }
       @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
 
-      /* нижняя панель ввода */
-.input {
-  display:flex; gap:8px; padding:12px;
-  border-top:1px solid rgba(255,255,255,.08);
-  /* отдельный фон, чтобы не сливался с body/messages */
-  background: #0e0e10;              /* можно #121417, если темнее нравится */
-}
-
-/* само поле ввода */
-.input input{
-  flex:1; height:40px;
-  border-radius:10px;
-  border:1px solid rgba(255,255,255,.16);
-  background:#101317;               /* НЕ прозрачный */
-  color:#e5e7eb; padding:10px 12px;
-  outline:none;
-}
-.input input::placeholder{ color:rgba(229,231,235,.55); }
-
-/* кнопка отправки — тот же «пилюльный» цвет */
-.input button{
-  border:0; border-radius:10px; padding:10px 14px;
-  color:#fff; cursor:pointer;
-  background: var(--pill, #2b2f36);
-}
-.input button:disabled{ opacity:.6; cursor:default; }
-
+      .input {
+        display:flex; gap:8px; padding:12px;
+        border-top:1px solid rgba(255,255,255,.08);
+        background: #0e0e10;
+      }
+      .input input{
+        flex:1; height:40px;
+        border-radius:10px;
+        border:1px solid rgba(255,255,255,.16);
+        background:#101317;
+        color:#e5e7eb; padding:10px 12px;
+        outline:none;
+      }
+      .input input::placeholder{ color:rgba(229,231,235,.55); }
+      .input button{
+        border:0; border-radius:10px; padding:10px 14px;
+        color:#fff; cursor:pointer;
+        background: var(--pill, #2b2f36);
+      }
+      .input button:disabled{ opacity:.6; cursor:default; }
     `;
     (doc.head || doc.getElementsByTagName("head")[0]).appendChild(style);
 
-    // 3) Chat logic script
     const script = doc.createElement("script");
     script.type = "text/javascript";
     script.textContent = `
@@ -793,6 +1506,49 @@ export default function AdminClientManage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="welcome_message">Welcome Message</Label>
+                    {/* Site ID */}
+<div className="space-y-2">
+  <Label htmlFor="site_id">Site ID</Label>
+  <Input
+    id="site_id"
+    placeholder="example.com or example.com::default"
+    value={settings.site_id}
+    onChange={(e) => setSettings({ ...settings, site_id: e.target.value })}
+  />
+  <p className="text-xs text-muted-foreground">
+    Used to associate sessions/messages with this client for analytics.
+  </p>
+</div>
+
+<div className="grid grid-cols-2 gap-4">
+  {/* Language */}
+  <div className="space-y-2">
+    <Label htmlFor="lang">Language</Label>
+    <select
+      id="lang"
+      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+      value={settings.lang}
+      onChange={(e) => setSettings({ ...settings, lang: e.target.value })}
+    >
+      <option value="en">English (en)</option>
+      <option value="ru">Русский (ru)</option>
+    </select>
+  </div>
+
+  {/* Position */}
+  <div className="space-y-2">
+    <Label htmlFor="position">Widget Position</Label>
+    <select
+      id="position"
+      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+      value={settings.position}
+      onChange={(e) => setSettings({ ...settings, position: e.target.value as "br" | "bl" })}
+    >
+      <option value="br">Bottom Right</option>
+      <option value="bl">Bottom Left</option>
+    </select>
+  </div>
+</div>
                     <Input
                       id="welcome_message"
                       value={settings.welcome_message}
@@ -839,6 +1595,115 @@ export default function AdminClientManage() {
                     </div>
                   </div>
 
+{/* Behavior */}
+<div className="space-y-2 pt-4 border-t">
+  <Label>Behavior</Label>
+
+  {/* Preserve / Reset */}
+  <div className="grid grid-cols-2 gap-4">
+    <div className="flex items-center justify-between rounded-md border p-3">
+      <div>
+        <div className="font-medium text-sm">Preserve History</div>
+        <div className="text-xs text-muted-foreground">Keep chat in localStorage</div>
+      </div>
+      <Switch
+        checked={settings.preserve_history}
+        onCheckedChange={(v) => setSettings({ ...settings, preserve_history: !!v })}
+      />
+    </div>
+
+    <div className="flex items-center justify-between rounded-md border p-3">
+      <div>
+        <div className="font-medium text-sm">Reset History on Open</div>
+        <div className="text-xs text-muted-foreground">Clear chat every open</div>
+      </div>
+      <Switch
+        checked={settings.reset_history_on_open}
+        onCheckedChange={(v) => setSettings({ ...settings, reset_history_on_open: !!v })}
+      />
+    </div>
+  </div>
+
+  {/* Autostart */}
+  <div className="rounded-md border p-3 space-y-3">
+    <div className="flex items-center justify-between">
+      <div>
+        <div className="font-medium text-sm">Autostart</div>
+        <div className="text-xs text-muted-foreground">Show first message automatically</div>
+      </div>
+      <Switch
+        checked={settings.autostart}
+        onCheckedChange={(v) => setSettings({ ...settings, autostart: !!v })}
+      />
+    </div>
+
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="space-y-1">
+        <Label htmlFor="autostart_mode">Mode</Label>
+        <select
+          id="autostart_mode"
+          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          value={settings.autostart_mode}
+          onChange={(e) => setSettings({ ...settings, autostart_mode: e.target.value as "local" | "ai" })}
+          disabled={!settings.autostart}
+        >
+          <option value="local">local</option>
+          <option value="ai">ai</option>
+        </select>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="autostart_delay">Delay (ms)</Label>
+        <Input
+          id="autostart_delay"
+          type="number"
+          min={0}
+          value={settings.autostart_delay}
+          onChange={(e) => setSettings({ ...settings, autostart_delay: Number(e.target.value || 0) })}
+          disabled={!settings.autostart}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="autostart_cooldown">Cooldown (hours)</Label>
+        <Input
+          id="autostart_cooldown"
+          type="number"
+          min={0}
+          value={settings.autostart_cooldown_hours}
+          onChange={(e) => setSettings({ ...settings, autostart_cooldown_hours: Number(e.target.value || 0) })}
+          disabled={!settings.autostart}
+        />
+      </div>
+    </div>
+
+    {settings.autostart_mode === "local" ? (
+      <div className="space-y-1">
+        <Label htmlFor="autostart_message">Autostart Message (local mode)</Label>
+        <Input
+          id="autostart_message"
+          value={settings.autostart_message}
+          onChange={(e) => setSettings({ ...settings, autostart_message: e.target.value })}
+          disabled={!settings.autostart}
+          placeholder="Hello! Need help choosing a plan?"
+        />
+      </div>
+    ) : (
+      <div className="space-y-1">
+        <Label htmlFor="autostart_prompt">Autostart Prompt (AI mode)</Label>
+        <Textarea
+          id="autostart_prompt"
+          rows={3}
+          value={settings.autostart_prompt}
+          onChange={(e) => setSettings({ ...settings, autostart_prompt: e.target.value })}
+          disabled={!settings.autostart}
+          placeholder="Write a warm opening message for a first-time visitor…"
+        />
+      </div>
+    )}
+  </div>
+</div>
+
                   {/* System Prompt */}
                   <div className="space-y-2 pt-4 border-t">
                     <Label htmlFor="system_prompt">Custom System Prompt (Optional)</Label>
@@ -872,6 +1737,7 @@ export default function AdminClientManage() {
                 </CardContent>
               </Card>
             </TabsContent>
+            
 
             {/* Knowledge Base */}
             <TabsContent value="knowledge" className="space-y-6">
@@ -1138,15 +2004,9 @@ export default function AdminClientManage() {
               </Card>
             </TabsContent>
 
-            {/* Analytics (placeholder) */}
+            {/* Analytics (NEW) */}
             <TabsContent value="analytics">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Analytics</CardTitle>
-                  <CardDescription>Coming soon</CardDescription>
-                </CardHeader>
-                <CardContent>…</CardContent>
-              </Card>
+              <AnalyticsTab siteId={settings.site_id || client?.siteId} />
             </TabsContent>
           </Tabs>
 
