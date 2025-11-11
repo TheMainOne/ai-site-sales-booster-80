@@ -21,6 +21,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { Send } from "lucide-react"; 
+
+
 
 const TOAST_SUCCESS = {
   style: { background: "#303036", color: "#ffffff", border: "1px solid #14532d" },
@@ -347,6 +350,7 @@ async function openSessionDialog(s: SessionsListItem) {
   useEffect(() => { if (!disabled) loadSessions(); /* eslint-disable-next-line */ }, [disabled, days, siteId, sessPage, sessLimit]);
   useEffect(() => { if (!disabled) loadMessages(); /* eslint-disable-next-line */ }, [disabled, days, siteId, msgPage, msgLimit, msgRole, q]);
   useEffect(() => { if (!disabled) loadGaps(); /* eslint-disable-next-line */ }, [disabled, days, siteId, gapsPage, gapsLimit, gapsOnlyUnresolved, gapsPhase, q]);
+
 
   const totalSessPages = Math.max(1, Math.ceil(sessionsTotalCount / sessLimit));
   const totalMsgPages  = Math.max(1, Math.ceil(messagesTotalCount / msgLimit));
@@ -821,6 +825,7 @@ const [settings, setSettings] = useState({
 });
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   // ===== Documents state (REAL data) =====
   const [docsLoading, setDocsLoading] = useState(true);
@@ -844,6 +849,8 @@ const [settings, setSettings] = useState({
   window.salesWidgetConfig = { apiKey: '${apiKey}', host: '${API_ORIGIN}' };
 </script>
 <script src="${API_ORIGIN}/widget-embed.js"></script>`;
+
+
 
   // ===== IFRAME PREVIEW REF =====
   const previewRef = useRef<HTMLIFrameElement | null>(null);
@@ -877,7 +884,7 @@ setSettings({
   background_color: cfg.backgroundColor  ?? "#0f0f0f",
   text_color:       cfg.textColor        ?? "#ffffff",
   border_color:     (cfg.borderColor ?? cfg.primaryColor ?? "#2927ea"),
-  logo_url:         cfg.logoUrl ?? null,
+    logo_url:     cfg.logo?.url ?? null, // <— вот так
 
   // поведение / метаданные
   site_id:          (cfg.siteId ?? data.siteId ?? ""),
@@ -974,14 +981,28 @@ setSettings({
   useEffect(() => { fetchDocuments(); /* eslint-disable-next-line */ }, [clientId]);
 
   // ===== Upload handlers =====
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setLogoPreview(String(reader.result));
-    reader.readAsDataURL(file);
-  };
-  const handleRemoveLogo = () => setLogoPreview(null);
+const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  // проверяем тип
+  if (!/^image\/(png|jpeg)$/.test(file.type)) {
+    toast.warning("Only PNG or JPEG allowed", TOAST_WARNING);
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onloadend = () => setLogoPreview(String(reader.result));
+  reader.readAsDataURL(file);
+
+  setLogoFile(file); // <— сохраняем сам файл
+};
+
+const handleRemoveLogo = () => {
+  setLogoPreview(null);
+  setLogoFile(null);
+  // опционально можно завести флаг removeLogo = true
+};
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1083,79 +1104,101 @@ setSettings({
   }
 
   // ===== Save (PUT /clients/:idOrSlug/widget-config) =====
-  const handleSaveSettings = async () => {
-    if (!clientId) return;
-    setSaving(true);
-    setError(null);
-    try {
-const payload: any = {
-  // UI
-  widgetTitle:        settings.widget_title,
-  welcomeMessage:     settings.welcome_message,
-  primaryColor:       settings.primary_color,
-  borderColor:        (settings.border_color || settings.primary_color),
-  backgroundColor:    settings.background_color,
-  textColor:          settings.text_color,
-  logoUrl:            logoPreview ?? settings.logo_url ?? null,
+const handleSaveSettings = async () => {
+  if (!clientId) return;
+  setSaving(true);
+  setError(null);
 
-  // поведение / метаданные
-  siteId:             (settings.site_id || "").trim(),
-  lang:               settings.lang,
-  position:           settings.position,
+  try {
+    // общие поля
+    const baseFields = {
+      widgetTitle:        settings.widget_title,
+      welcomeMessage:     settings.welcome_message,
+      primaryColor:       settings.primary_color,
+      borderColor:        (settings.border_color || settings.primary_color),
+      backgroundColor:    settings.background_color,
+      textColor:          settings.text_color,
 
-  autostart:              !!settings.autostart,
-  autostartDelay:         Number(settings.autostart_delay) || 0,
-  autostartMode:          settings.autostart_mode,
-  autostartMessage:       settings.autostart_message,
-  autostartPrompt:        settings.autostart_prompt,
-  autostartCooldownHours: Number(settings.autostart_cooldown_hours) || 0,
+      siteId:             (settings.site_id || "").trim(),
+      lang:               settings.lang,
+      position:           settings.position,
 
-  preserveHistory:        !!settings.preserve_history,
-  resetHistoryOnOpen:     !!settings.reset_history_on_open,
+      autostart:              !!settings.autostart,
+      autostartDelay:         Number(settings.autostart_delay) || 0,
+      autostartMode:          settings.autostart_mode,
+      autostartMessage:       settings.autostart_message,
+      autostartPrompt:        settings.autostart_prompt,
+      autostartCooldownHours: Number(settings.autostart_cooldown_hours) || 0,
 
-  // LLM
-  customSystemPrompt:     settings.system_prompt,
+      preserveHistory:        !!settings.preserve_history,
+      resetHistoryOnOpen:     !!settings.reset_history_on_open,
 
-  // флаги
-  isActive:               true,
-};
+      customSystemPrompt:     settings.system_prompt,
+      isActive:               true,
+    };
 
-      if (settings.site_id && settings.site_id.trim()) payload.siteId = settings.site_id.trim();
+    let res: Response;
 
-      const res = await fetch(WIDGET_CFG_API.put(clientId), {
+    if (logoFile) {
+      // === multipart/form-data ===
+      const fd = new FormData();
+      Object.entries(baseFields).forEach(([k, v]) => {
+        fd.append(k, typeof v === "string" ? v : JSON.stringify(v));
+      });
+      fd.append("logo", logoFile); // <— ключ совпадает с multer-s3.single("logo")
+
+      res = await fetch(WIDGET_CFG_API.put(clientId), {
+        method: "PUT",
+        body: fd,
+        credentials: "omit",
+      });
+    } else {
+      // === обычный JSON ===
+      res = await fetch(WIDGET_CFG_API.put(clientId), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "omit",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(baseFields),
       });
-      if (!res.ok) throw new Error(await res.text());
-      const { config } = await res.json();
-
-      setSettings((prev) => ({
-        ...prev,
-        widget_title:     config?.widgetTitle      ?? prev.widget_title,
-        welcome_message:  config?.welcomeMessage   ?? prev.welcome_message,
-        primary_color:    config?.primaryColor     ?? prev.primary_color,
-        background_color: config?.backgroundColor  ?? prev.background_color,
-        text_color:       config?.textColor        ?? prev.text_color,
-        border_color:     config?.borderColor      ?? prev.border_color,
-        logo_url:         config?.logoUrl ?? prev.logo_url,
-        site_id:          config?.siteId ?? prev.site_id,
-        system_prompt:
-          (config?.customSystemPrompt && String(config.customSystemPrompt).trim().length
-            ? config.customSystemPrompt
-            : prev.system_prompt),
-      }));
-      setLogoPreview(null);
-
-      toast.success("Saved", { description: "Widget settings were updated successfully.", ...TOAST_SUCCESS });
-    } catch (e: any) {
-      setError(e?.message || "Failed to save settings");
-      toast.warning("Save failed", { description: e?.message || "Please try again.", ...TOAST_WARNING });
-    } finally {
-      setSaving(false);
     }
-  };
+
+    if (!res.ok) throw new Error(await res.text());
+    const { config } = await res.json();
+
+    setSettings((prev) => ({
+      ...prev,
+      widget_title:     config?.widgetTitle      ?? prev.widget_title,
+      welcome_message:  config?.welcomeMessage   ?? prev.welcome_message,
+      primary_color:    config?.primaryColor     ?? prev.primary_color,
+      background_color: config?.backgroundColor  ?? prev.background_color,
+      text_color:       config?.textColor        ?? prev.text_color,
+      border_color:     config?.borderColor      ?? prev.border_color,
+      logo_url:         config?.logo?.url ?? prev.logo_url,
+      site_id:          config?.siteId ?? prev.site_id,
+      system_prompt:
+        (config?.customSystemPrompt && String(config.customSystemPrompt).trim().length
+          ? config.customSystemPrompt
+          : prev.system_prompt),
+    }));
+
+    setLogoPreview(null);
+    setLogoFile(null);
+
+    toast.success("Saved", {
+      description: "Widget settings were updated successfully.",
+      ...TOAST_SUCCESS,
+    });
+  } catch (e: any) {
+    setError(e?.message || "Failed to save settings");
+    toast.warning("Save failed", {
+      description: e?.message || "Please try again.",
+      ...TOAST_WARNING,
+    });
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   // ===== Helper to inject preview HTML into iframe (REAL chat, no inner scrollbars) =====
   function injectPreview() {
@@ -1184,10 +1227,23 @@ const payload: any = {
                 <div class="messages" id="messages">
                   <div class="row ai"><div class="bubble" id="welcome"></div></div>
                 </div>
-                <div class="input">
-                  <input id="inp" placeholder="Type a message…" aria-label="Type a message…"/>
-                  <button id="send">Send</button>
-                </div>
+<div class="composer">
+  <form id="composer-form" class="form">
+   <div class="field">
+  <textarea id="inp" placeholder="Type your message..." aria-label="Type your message..."></textarea>
+  <button id="send" type="submit" aria-label="Send">
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path d="M2 21l20-9L2 3l5 8-5 10z"></path>
+    </svg>
+  </button>
+</div>
+<div class="info">
+  <div class="hint">Press Enter to send, Shift+Enter for new line</div>
+  <div class="counter" id="counter">0/1000</div>
+</div>
+  </form>
+</div>
+
               </div>
             </div>
           </div>
@@ -1241,26 +1297,50 @@ const payload: any = {
       .dot:nth-child(3) { animation-delay:.4s; }
       @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
 
-      .input {
-        display:flex; gap:8px; padding:12px;
-        border-top:1px solid rgba(255,255,255,.08);
-        background: #0e0e10;
-      }
-      .input input{
-        flex:1; height:40px;
-        border-radius:10px;
-        border:1px solid rgba(255,255,255,.16);
-        background:#101317;
-        color:#e5e7eb; padding:10px 12px;
-        outline:none;
-      }
-      .input input::placeholder{ color:rgba(229,231,235,.55); }
-      .input button{
-        border:0; border-radius:10px; padding:10px 14px;
-        color:#fff; cursor:pointer;
-        background: var(--pill, #2b2f36);
-      }
-      .input button:disabled{ opacity:.6; cursor:default; }
+    /* базовая сетка, чтобы не «плыло» */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* === Composer (новый футер) === */
+.composer { padding:16px 20px; border-top:1px solid rgba(255,255,255,.08); background:#0b0c0f; }
+.form{ max-width:1100px; margin:0 auto; }
+.form .field{ position:relative; isolation:isolate; } /* кнопка центрируется по высоте поля */
+.form textarea{
+  display:block;
+  width:100%;
+  min-height:56px;
+  resize:vertical;
+  background:#1b1c20;
+  color:#e5e7eb;
+  border:1px solid #2f3136;
+  border-radius:16px;
+  padding:12px 80px 12px 12px; /* запас справа под кнопку + иконки расширений */
+  outline:none;
+  line-height:1.4; font-size:14px; font-family:inherit; caret-color:#fff;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.03), 0 1px 2px rgba(0,0,0,.4);
+  box-sizing:border-box;
+}
+.form textarea::placeholder{ color:rgba(229,231,235,.55); }
+
+.form button#send{
+  position:absolute;
+  right:12px;
+  top:50%; transform:translateY(-50%);
+  height:40px; width:40px;
+  border:none; border-radius:9999px;
+  background:var(--pill,#2b2f36); color:#fff; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 6px rgba(0,0,0,.35);
+  z-index:2; /* поверх значков Grammarly и т.п. */
+}
+.form button#send svg path{ fill:currentColor; }
+.form button#send:disabled{ opacity:.6; cursor:default; }
+
+.form .info{
+  margin-top:8px; display:flex; align-items:center; justify-content:space-between;
+  gap:12px; font-size:12px; color:rgba(229,231,235,.55);
+}
+.form .hint{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.form .counter{ white-space:nowrap; }
     `;
     (doc.head || doc.getElementsByTagName("head")[0]).appendChild(style);
 
@@ -1301,6 +1381,18 @@ const payload: any = {
         var messages = document.getElementById('messages');
         var inp = document.getElementById('inp');
         var btn = document.getElementById('send');
+        var form = document.getElementById('composer-form');
+var counter = document.getElementById('counter');
+var MAX = 1000;
+function updateCounter() {
+  var len = (inp.value || '').length;
+  counter.textContent = len + '/' + MAX;
+}
+inp.addEventListener('input', function () {
+  if (inp.value.length > MAX) inp.value = inp.value.slice(0, MAX);
+  updateCounter();
+});
+updateCounter();
         function scrollToBottom(){ messages.scrollTop = messages.scrollHeight; }
 
         function append(role, text) {
@@ -1324,7 +1416,7 @@ const payload: any = {
 
         async function sendMessage(){
           var text = (inp.value || '').trim(); if (!text) return;
-          append('user', text); inp.value=''; btn.disabled = true;
+          append('user', text); inp.value=''; updateCounter(); btn.disabled = true;
           var typingRow = showTyping(); var typingBubble = typingRow.querySelector('.bubble');
 
           try {
@@ -1371,7 +1463,21 @@ const payload: any = {
         }
 
         btn.addEventListener('click', sendMessage);
-        inp.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') sendMessage(); });
+        inp.addEventListener('keydown', function (ev) {
+  if (ev.key === 'Enter' && !ev.shiftKey) {
+    ev.preventDefault();
+    form.requestSubmit(); // отправляем форму
+  }
+});
+form.addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  sendMessage();
+});
+btn.addEventListener('click', function (ev) {
+  ev.preventDefault();
+  form.requestSubmit();
+});
+
       })();
     `;
     (doc.body || doc.getElementsByTagName("body")[0]).appendChild(script);
