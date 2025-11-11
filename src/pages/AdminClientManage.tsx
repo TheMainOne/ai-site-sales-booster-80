@@ -1549,11 +1549,18 @@ const payload: any = {
     </select>
   </div>
 </div>
-                    <Input
-                      id="welcome_message"
-                      value={settings.welcome_message}
-                      onChange={(e) => setSettings({ ...settings, welcome_message: e.target.value })}
-                    />
+<div className="space-y-2">
+  <Label htmlFor="welcome_message">Welcome Message</Label>
+  <Input
+    id="welcome_message"
+    placeholder="Hi! How can I help you today?"
+    value={settings.welcome_message}
+    onChange={(e) => setSettings({ ...settings, welcome_message: e.target.value })}
+  />
+  <p className="text-xs text-muted-foreground">
+    This is the initial greeting the widget displays when opened.
+  </p>
+</div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
