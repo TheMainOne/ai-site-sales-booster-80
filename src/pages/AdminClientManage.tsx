@@ -44,7 +44,44 @@ const DOCS_API = {
   download: (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/download`,
   text:     (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/text`,
   remove:   (id: string, docId: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}`,
+   preview:  (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/preview`,
 };
+
+function isPdf(doc: DocDTO) {
+  return (doc.contentType?.toLowerCase().includes("pdf")) || /\.pdf$/i.test(doc.fileName || "");
+}
+function isImage(doc: DocDTO) {
+  const ct = doc.contentType?.toLowerCase() || "";
+  return ct.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg)$/i.test(doc.fileName || "");
+}
+function isTextLike(doc: DocDTO) {
+  const ct = doc.contentType?.toLowerCase() || "";
+  return ct.startsWith("text/") || ct.includes("markdown") || /\.(txt|md)$/i.test(doc.fileName || "");
+}
+function isOffice(doc: DocDTO) {
+  const name = doc.fileName?.toLowerCase() || "";
+  const ct = doc.contentType?.toLowerCase() || "";
+  return (
+    /\.(docx|xlsx|pptx)$/i.test(name) ||
+    ct.includes("officedocument")
+  );
+}
+
+// если в ответе есть s3Url — используем его; иначе fallback на backend inline
+function getPublicViewUrl(doc: DocDTO) {
+  if (doc.s3Url) return doc.s3Url;
+  return DOCS_API.preview(doc._id); // бэкенд сделает 302/inline
+}
+
+function getDownloadUrl(doc: DocDTO) {
+  return doc.s3Url || ""; // только прямой S3-URL
+}
+
+// опционально: обёртка Google Docs Viewer для офисных форматов
+function asGoogleViewer(url: string) {
+  return `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(url)}`;
+}
+
 
 // ===== Widget Config API helpers =====
 const WIDGET_CFG_API = {
@@ -111,7 +148,11 @@ type DocumentDialog = {
   is_active: boolean;
   created_at: string;
   file_size: number;
-  content?: string;
+  contentType?: string;
+  // что показываем
+  mode: "pdf" | "image" | "text" | "office" | "unknown";
+  viewUrl?: string;  // для iframe/img
+  content?: string;  // для text
 };
 
 /* =========================
@@ -1048,25 +1089,9 @@ const handleRemoveLogo = () => {
   }
 
   // ===== View / Download / Delete handlers =====
-  async function handleViewDocumentById(doc: DocDTO) {
-    try {
-      const res = await fetch(DOCS_API.text(doc._id), { credentials: "omit" });
-      if (res.ok) {
-        const data = await res.json();
-        const content = typeof data === "string" ? data : (data?.text ?? "");
-        setViewingDocument({
-          id: doc._id,
-          title: doc.title || doc.fileName,
-          file_name: doc.fileName,
-          is_active: !!doc.isActive,
-          created_at: doc.createdAt || new Date().toISOString(),
-          file_size: doc.size || 0,
-          content: content || "No preview available",
-        });
-        setIsViewDialogOpen(true);
-        return;
-      }
-    } catch (_) {}
+async function handleViewDocumentById(doc: DocDTO) {
+  // 1) PDF
+  if (isPdf(doc)) {
     setViewingDocument({
       id: doc._id,
       title: doc.title || doc.fileName,
@@ -1074,15 +1099,97 @@ const handleRemoveLogo = () => {
       is_active: !!doc.isActive,
       created_at: doc.createdAt || new Date().toISOString(),
       file_size: doc.size || 0,
-      content: "Preview is not available for this file type. Use Download.",
+      contentType: doc.contentType,
+      mode: "pdf",
+      viewUrl: getPublicViewUrl(doc),
     });
     setIsViewDialogOpen(true);
+    return;
   }
 
+  // 2) Image
+  if (isImage(doc)) {
+    setViewingDocument({
+      id: doc._id,
+      title: doc.title || doc.fileName,
+      file_name: doc.fileName,
+      is_active: !!doc.isActive,
+      created_at: doc.createdAt || new Date().toISOString(),
+      file_size: doc.size || 0,
+      contentType: doc.contentType,
+      mode: "image",
+      viewUrl: getPublicViewUrl(doc),
+    });
+    setIsViewDialogOpen(true);
+    return;
+  }
+
+  // 3) Text-like
+  if (isTextLike(doc)) {
+    try {
+      const res = await fetch(DOCS_API.text(doc._id), { credentials: "omit" });
+      const data = res.ok ? await res.json() : {};
+      const content = typeof data === "string" ? data : (data?.text ?? "");
+      setViewingDocument({
+        id: doc._id,
+        title: doc.title || doc.fileName,
+        file_name: doc.fileName,
+        is_active: !!doc.isActive,
+        created_at: doc.createdAt || new Date().toISOString(),
+        file_size: doc.size || 0,
+        contentType: doc.contentType,
+        mode: "text",
+        content: content || "No preview available",
+      });
+      setIsViewDialogOpen(true);
+      return;
+    } catch {
+      // пойдём в unknown
+    }
+  }
+
+  // 4) Office (docx/xlsx/pptx) — используем Google Viewer
+  if (isOffice(doc)) {
+    const raw = getPublicViewUrl(doc);
+    setViewingDocument({
+      id: doc._id,
+      title: doc.title || doc.fileName,
+      file_name: doc.fileName,
+      is_active: !!doc.isActive,
+      created_at: doc.createdAt || new Date().toISOString(),
+      file_size: doc.size || 0,
+      contentType: doc.contentType,
+      mode: "office",
+      viewUrl: asGoogleViewer(raw),
+    });
+    setIsViewDialogOpen(true);
+    return;
+  }
+
+  // 5) Fallback
+  setViewingDocument({
+    id: doc._id,
+    title: doc.title || doc.fileName,
+    file_name: doc.fileName,
+    is_active: !!doc.isActive,
+    created_at: doc.createdAt || new Date().toISOString(),
+    file_size: doc.size || 0,
+    contentType: doc.contentType,
+    mode: "unknown",
+  });
+  setIsViewDialogOpen(true);
+}
+
+
 function handleDownloadDocumentById(doc: DocDTO) {
-  const url = doc.s3Url || DOCS_API.download(doc._id);
+  const url = getDownloadUrl(doc);
+  if (!url) {
+    toast.warning("Download unavailable", { description: "s3Url is missing for this file.", ...TOAST_WARNING });
+    return;
+  }
   window.open(url, "_blank", "noopener");
 }
+
 
   async function handleDeleteDocument(doc: DocDTO) {
     if (!clientId) {
@@ -2209,41 +2316,92 @@ btn.addEventListener('click', function (ev) {
           </Tabs>
 
           {/* View Document Dialog */}
-          <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-            <DialogContent className="max-w-4xl max-h-[80vh]">
-              <DialogHeader>
-                <DialogTitle>{viewingDocument?.title}</DialogTitle>
-                <DialogDescription>
-                  {viewingDocument?.file_name} •{" "}
-                  {viewingDocument?.file_size ? (viewingDocument.file_size / 1024).toFixed(1) : 0} KB
-                </DialogDescription>
-              </DialogHeader>
-              <ScrollArea className="h-[60vh] w-full rounded-md border p-4">
-                <pre className="whitespace-pre-wrap font-mono text-sm">
-                  {viewingDocument?.content || "No content available"}
-                </pre>
-              </ScrollArea>
-              <div className="flex justify-end gap-2">
-                <Button
-  variant="outline"
-  onClick={() =>
-    viewingDocument &&
-    window.open(
-      // 👇 используем тот же приоритет: s3Url -> fallback
-      (documents.find(d => d._id === viewingDocument.id)?.s3Url) ||
-      DOCS_API.download(viewingDocument.id),
-      "_blank",
-      "noopener"
-    )
-  }
+<Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+  <DialogContent className="max-w-5xl max-h-[85vh]">
+    <DialogHeader>
+      <DialogTitle>{viewingDocument?.title}</DialogTitle>
+      <DialogDescription>
+        {viewingDocument?.file_name} •{" "}
+        {viewingDocument?.file_size ? (viewingDocument.file_size / 1024).toFixed(1) : 0} KB
+        {viewingDocument?.contentType ? ` • ${viewingDocument.contentType}` : ""}
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="h-[65vh] border rounded overflow-hidden bg-muted/20">
+      {viewingDocument?.mode === "pdf" && viewingDocument.viewUrl && (
+        <iframe
+          title="Preview PDF"
+          src={viewingDocument.viewUrl}
+          className="w-full h-full"
+        />
+      )}
+
+      {viewingDocument?.mode === "image" && viewingDocument.viewUrl && (
+        <div className="w-full h-full flex items-center justify-center bg-black/50">
+          <img
+            src={viewingDocument.viewUrl}
+            alt={viewingDocument.title}
+            className="max-h-full max-w-full object-contain"
+          />
+        </div>
+      )}
+
+      {viewingDocument?.mode === "text" && (
+        <ScrollArea className="h-full w-full p-4">
+          <pre className="whitespace-pre-wrap font-mono text-sm">
+            {viewingDocument.content || "No content"}
+          </pre>
+        </ScrollArea>
+      )}
+
+      {viewingDocument?.mode === "office" && viewingDocument.viewUrl && (
+        <iframe
+          title="Preview Document"
+          src={viewingDocument.viewUrl}
+          className="w-full h-full"
+        />
+      )}
+
+      {viewingDocument?.mode === "unknown" && (
+        <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+          Preview not available. Use Download.
+        </div>
+      )}
+    </div>
+
+    <div className="flex justify-end gap-2">
+      <Button
+        variant="outline"
+        onClick={() =>
+          viewingDocument &&
+          window.open(
+            getPublicViewUrl(documents.find(d => d._id === viewingDocument.id) || { _id: viewingDocument.id } as DocDTO),
+            "_blank",
+            "noopener"
+          )
+        }
+      >
+        <ExternalLink className="w-4 h-4 mr-2" />
+        Open in new tab
+      </Button>
+<Button
+  onClick={() => {
+    if (!viewingDocument) return;
+    const doc = documents.find(d => d._id === viewingDocument.id);
+    if (!doc || !doc.s3Url) {
+      toast.warning("Download unavailable", { description: "s3Url is missing for this file.", ...TOAST_WARNING });
+      return;
+    }
+    const url = getDownloadUrl(doc);
+    window.open(url, "_blank", "noopener");
+  }}
 >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-                <Button onClick={() => setIsViewDialogOpen(false)}>Close</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+  <Download className="w-4 h-4 mr-2" />
+  Download
+</Button>
+    </div>
+  </DialogContent>
+</Dialog>
         </div>
       )}
     </div>
