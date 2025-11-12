@@ -101,6 +101,7 @@ type DocDTO = {
   size?: number;
   isActive?: boolean;
   createdAt?: string;
+   s3Url?: string;
 };
 
 type DocumentDialog = {
@@ -969,6 +970,7 @@ setSettings({
         size: typeof d.size === "number" ? d.size : d.fileSize,
         isActive: d.isActive ?? true,
         createdAt: d.createdAt || d.uploadedAt,
+          s3Url: d.s3Url,
       }));
       setDocuments(mapped);
     } catch (e: any) {
@@ -1077,10 +1079,10 @@ const handleRemoveLogo = () => {
     setIsViewDialogOpen(true);
   }
 
-  function handleDownloadDocumentById(doc: DocDTO) {
-    const url = DOCS_API.download(doc._id);
-    window.open(url, "_blank");
-  }
+function handleDownloadDocumentById(doc: DocDTO) {
+  const url = doc.s3Url || DOCS_API.download(doc._id);
+  window.open(url, "_blank", "noopener");
+}
 
   async function handleDeleteDocument(doc: DocDTO) {
     if (!clientId) {
@@ -2222,7 +2224,19 @@ btn.addEventListener('click', function (ev) {
                 </pre>
               </ScrollArea>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => viewingDocument && window.open(DOCS_API.download(viewingDocument.id), "_blank")}>
+                <Button
+  variant="outline"
+  onClick={() =>
+    viewingDocument &&
+    window.open(
+      // 👇 используем тот же приоритет: s3Url -> fallback
+      (documents.find(d => d._id === viewingDocument.id)?.s3Url) ||
+      DOCS_API.download(viewingDocument.id),
+      "_blank",
+      "noopener"
+    )
+  }
+>
                   <Download className="w-4 h-4 mr-2" />
                   Download
                 </Button>
