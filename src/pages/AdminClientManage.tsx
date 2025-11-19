@@ -837,35 +837,66 @@ export default function AdminClientManage() {
   >("setup");
 
   // ===== Widget settings UI (from WidgetConfig) =====
-const [settings, setSettings] = useState({
-  // базовые UI
-  widget_title: "AI Assistant",
-  welcome_message: "Hi! How can I help you today?",
-  primary_color: "#2927ea",
-  background_color: "#0f0f0f",
-  text_color: "#ffffff",
-  border_color: "#2927ea",
-  logo_url: null as string | null,
+  const [settings, setSettings] = useState({
+    // базовые UI
+    widget_title: "AI Assistant",
+    welcome_message: "Hi! How can I help you today?",
+    primary_color: "#2927ea",
+    background_color: "#0f0f0f",
+    text_color: "#ffffff",
+    border_color: "#2927ea",
+    logo_url: null as string | null,
 
-  // поведение / метаданные
-  site_id: "",
-  lang: "en" as "en" | "ru" | string,
-  position: "br" as "br" | "bl",
+    // мета / позиционирование
+    site_id: "",
+    lang: "en" as "en" | "ru" | string,
+    position: "br" as "br" | "bl",
 
-  autostart: false,
-  autostart_delay: 5000,
-  autostart_mode: "local" as "local" | "ai",
-  autostart_message: "",
-  autostart_prompt: "",
-  autostart_cooldown_hours: 12,
+    // поведение / автозапуск
+    autostart: false,
+    autostart_delay: 5000,
+    autostart_mode: "local" as "local" | "ai",
+    autostart_message: "",
+    autostart_prompt: "",
+    autostart_cooldown_hours: 12,
 
-  preserve_history: true,
-  reset_history_on_open: false,
+    // история
+    preserve_history: true,
+    reset_history_on_open: false,
 
-  // LLM
-  system_prompt: DEFAULT_SYSTEM_PROMPT,
-});
+    // НОВЫЕ UI-поля
+    input_placeholder: "",
+    header_bg_color: "",
+    header_text_color: "",
+    assistant_bubble_color: "",
+    assistant_bubble_text_color: "",
+    user_bubble_color: "",
+    user_bubble_text_color: "",
+    bubble_border_color: "",
+    input_bg_color: "",
+    input_text_color: "",
+    input_border_color: "",
+    send_button_bg_color: "",
+    send_button_icon_color: "",
+    show_avatars: true,
+    show_timestamps: true,
 
+    // потоковый ответ
+    stream: true,
+
+    // шрифты
+    font_family: "",
+    font_css_url: "",
+    font_file_url: "",
+
+    // inline-автостарт (сырое JSON для UI)
+    inline_autostart_raw: "",
+
+    // LLM
+    system_prompt: DEFAULT_SYSTEM_PROMPT,
+  });
+
+const [fontUploading, setFontUploading] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
@@ -916,39 +947,68 @@ const [settings, setSettings] = useState({
         if (clientId) {
           const cfgRes = await fetch(WIDGET_CFG_API.get(clientId), { credentials: "omit" });
           if (cfgRes.ok) {
-            const { config } = await cfgRes.json();
+                        const { config } = await cfgRes.json();
             const cfg = config || {};
-setSettings({
-  // UI
-  widget_title:     cfg.widgetTitle      ?? "AI Assistant",
-  welcome_message:  cfg.welcomeMessage   ?? "Hi! How can I help you today?",
-  primary_color:    cfg.primaryColor     ?? "#2927ea",
-  background_color: cfg.backgroundColor  ?? "#0f0f0f",
-  text_color:       cfg.textColor        ?? "#ffffff",
-  border_color:     (cfg.borderColor ?? cfg.primaryColor ?? "#2927ea"),
-    logo_url:     cfg.logo?.url ?? null, // <— вот так
 
-  // поведение / метаданные
-  site_id:          (cfg.siteId ?? data.siteId ?? ""),
-  lang:             (cfg.lang ?? "en"),
-  position:         (cfg.position ?? "br"),
+            setSettings({
+              // UI
+              widget_title:     cfg.widgetTitle      ?? "AI Assistant",
+              welcome_message:  cfg.welcomeMessage   ?? "Hi! How can I help you today?",
+              primary_color:    cfg.primaryColor     ?? "#2927ea",
+              background_color: cfg.backgroundColor  ?? "#0f0f0f",
+              text_color:       cfg.textColor        ?? "#ffffff",
+              border_color:     (cfg.borderColor ?? cfg.primaryColor ?? "#2927ea"),
+              logo_url:         cfg.logo?.url ?? null,
 
-  autostart:                !!cfg.autostart,
-  autostart_delay:          typeof cfg.autostartDelay === "number" ? cfg.autostartDelay : 5000,
-  autostart_mode:           (cfg.autostartMode ?? "local"),
-  autostart_message:        (cfg.autostartMessage ?? ""),
-  autostart_prompt:         (cfg.autostartPrompt ?? ""),
-  autostart_cooldown_hours: typeof cfg.autostartCooldownHours === "number" ? cfg.autostartCooldownHours : 12,
+              // поведение / метаданные
+              site_id:          (cfg.siteId ?? data.siteId ?? ""),
+              lang:             (cfg.lang ?? "en"),
+              position:         (cfg.position ?? "br"),
 
-  preserve_history:         cfg.preserveHistory ?? true,
-  reset_history_on_open:    !!cfg.resetHistoryOnOpen,
+              autostart:                !!cfg.autostart,
+              autostart_delay:          typeof cfg.autostartDelay === "number" ? cfg.autostartDelay : 5000,
+              autostart_mode:           (cfg.autostartMode ?? "local"),
+              autostart_message:        (cfg.autostartMessage ?? ""),
+              autostart_prompt:         (cfg.autostartPrompt ?? ""),
+              autostart_cooldown_hours: typeof cfg.autostartCooldownHours === "number" ? cfg.autostartCooldownHours : 12,
 
-  // LLM
-  system_prompt:
-    (cfg?.customSystemPrompt && String(cfg.customSystemPrompt).trim().length
-      ? cfg.customSystemPrompt
-      : DEFAULT_SYSTEM_PROMPT),
-});
+              preserve_history:         cfg.preserveHistory ?? true,
+              reset_history_on_open:    !!cfg.resetHistoryOnOpen,
+
+              // НОВЫЕ UI-поля (как есть из конфига)
+              input_placeholder:         cfg.inputPlaceholder        ?? "",
+              header_bg_color:           cfg.headerBackgroundColor   || "",
+              header_text_color:         cfg.headerTextColor         || "",
+              assistant_bubble_color:    cfg.assistantBubbleColor    || "",
+              assistant_bubble_text_color: cfg.assistantBubbleTextColor || "",
+              user_bubble_color:         cfg.userBubbleColor         || "",
+              user_bubble_text_color:    cfg.userBubbleTextColor     || "",
+              bubble_border_color:       cfg.bubbleBorderColor       || "",
+              input_bg_color:            cfg.inputBackgroundColor    || "",
+              input_text_color:          cfg.inputTextColor          || "",
+              input_border_color:        cfg.inputBorderColor        || "",
+              send_button_bg_color:      cfg.sendButtonBackgroundColor || "",
+              send_button_icon_color:    cfg.sendButtonIconColor     || "",
+              show_avatars:              cfg.showAvatars !== false,
+              show_timestamps:           cfg.showTimestamps !== false,
+
+              stream:                    cfg.stream !== false,
+
+              font_family:               cfg.fontFamily  || "",
+              font_css_url:              cfg.fontCssUrl  || "",
+              font_file_url:             cfg.fontFileUrl || "",
+
+              inline_autostart_raw:      cfg.inlineAutostart
+                ? JSON.stringify(cfg.inlineAutostart, null, 2)
+                : "",
+
+              // LLM
+              system_prompt:
+                (cfg?.customSystemPrompt && String(cfg.customSystemPrompt).trim().length
+                  ? cfg.customSystemPrompt
+                  : DEFAULT_SYSTEM_PROMPT),
+            });
+
             setLogoPreview(null);
           } else {
             // если конфиг не найден — хотя бы скопировать client.siteId
@@ -1232,6 +1292,7 @@ const handleSaveSettings = async () => {
       lang:               settings.lang,
       position:           settings.position,
 
+      // поведение
       autostart:              !!settings.autostart,
       autostartDelay:         Number(settings.autostart_delay) || 0,
       autostartMode:          settings.autostart_mode,
@@ -1242,9 +1303,38 @@ const handleSaveSettings = async () => {
       preserveHistory:        !!settings.preserve_history,
       resetHistoryOnOpen:     !!settings.reset_history_on_open,
 
+      // НОВЫЕ UI-поля
+      inputPlaceholder:         settings.input_placeholder,
+      headerBackgroundColor:    settings.header_bg_color,
+      headerTextColor:          settings.header_text_color,
+      assistantBubbleColor:     settings.assistant_bubble_color,
+      assistantBubbleTextColor: settings.assistant_bubble_text_color,
+      userBubbleColor:          settings.user_bubble_color,
+      userBubbleTextColor:      settings.user_bubble_text_color,
+      bubbleBorderColor:        settings.bubble_border_color,
+      inputBackgroundColor:     settings.input_bg_color,
+      inputTextColor:           settings.input_text_color,
+      inputBorderColor:         settings.input_border_color,
+      sendButtonBackgroundColor: settings.send_button_bg_color,
+      sendButtonIconColor:       settings.send_button_icon_color,
+      showAvatars:              !!settings.show_avatars,
+      showTimestamps:           !!settings.show_timestamps,
+
+      stream:                   !!settings.stream,
+
+      // шрифты
+      fontFamily:  settings.font_family,
+      fontCssUrl:  settings.font_css_url,
+      fontFileUrl: settings.font_file_url,
+
+      // inline-автостарт — сырая строка, бэкенд сам распарсит
+      inlineAutostart: settings.inline_autostart_raw.trim() || "",
+
+      // LLM
       customSystemPrompt:     settings.system_prompt,
       isActive:               true,
     };
+
 
     let res: Response;
 
@@ -1859,6 +1949,20 @@ btn.addEventListener('click', function (ev) {
     This is the initial greeting the widget displays when opened.
   </p>
 </div>
+
+<div className="space-y-2">
+  <Label htmlFor="input_placeholder">Input Placeholder</Label>
+  <Input
+    id="input_placeholder"
+    placeholder="Type your message..."
+    value={settings.input_placeholder}
+    onChange={(e) => setSettings({ ...settings, input_placeholder: e.target.value })}
+  />
+  <p className="text-xs text-muted-foreground">
+    Placeholder text inside the message input. Leave empty to use a default per language.
+  </p>
+</div>
+
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -1899,6 +2003,260 @@ btn.addEventListener('click', function (ev) {
                       />
                     </div>
                   </div>
+
+                  {/* Advanced chat colors */}
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="header_bg_color">Header Background (optional)</Label>
+                      <Input
+                        id="header_bg_color"
+                        placeholder="#101215"
+                        type="color"
+                        value={settings.header_bg_color}
+                        onChange={(e) => setSettings({ ...settings, header_bg_color: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="header_text_color">Header Text (optional)</Label>
+                      <Input
+                        id="header_text_color"
+                        placeholder="#ffffff"
+                        value={settings.header_text_color}
+                        onChange={(e) => setSettings({ ...settings, header_text_color: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="assistant_bubble_color">Assistant Bubble Background</Label>
+                      <Input
+                        id="assistant_bubble_color"
+                        placeholder="#22252b"
+                        value={settings.assistant_bubble_color}
+                        onChange={(e) => setSettings({ ...settings, assistant_bubble_color: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="assistant_bubble_text_color">Assistant Bubble Text</Label>
+                      <Input
+                        id="assistant_bubble_text_color"
+                        placeholder="#ffffff"
+                        value={settings.assistant_bubble_text_color}
+                        onChange={(e) => setSettings({ ...settings, assistant_bubble_text_color: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="user_bubble_color">User Bubble Background</Label>
+                      <Input
+                        id="user_bubble_color"
+                        placeholder="#2b2f36"
+                        value={settings.user_bubble_color}
+                        onChange={(e) => setSettings({ ...settings, user_bubble_color: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="user_bubble_text_color">User Bubble Text</Label>
+                      <Input
+                        id="user_bubble_text_color"
+                        placeholder="#ffffff"
+                        value={settings.user_bubble_text_color}
+                        onChange={(e) => setSettings({ ...settings, user_bubble_text_color: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="bubble_border_color">Bubble Border (optional)</Label>
+                      <Input
+                        id="bubble_border_color"
+                        placeholder="#333333"
+                        value={settings.bubble_border_color}
+                        onChange={(e) => setSettings({ ...settings, bubble_border_color: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="input_bg_color">Input Background</Label>
+                      <Input
+                        id="input_bg_color"
+                        placeholder="#16191e"
+                        value={settings.input_bg_color}
+                        onChange={(e) => setSettings({ ...settings, input_bg_color: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="input_text_color">Input Text</Label>
+                      <Input
+                        id="input_text_color"
+                        placeholder="#e9edf3"
+                        value={settings.input_text_color}
+                        onChange={(e) => setSettings({ ...settings, input_text_color: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="input_border_color">Input Border</Label>
+                      <Input
+                        id="input_border_color"
+                        placeholder="#2f3136"
+                        value={settings.input_border_color}
+                        onChange={(e) => setSettings({ ...settings, input_border_color: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="send_button_bg_color">Send Button Background</Label>
+                      <Input
+                        id="send_button_bg_color"
+                        placeholder="#2b2f36"
+                        value={settings.send_button_bg_color}
+                        onChange={(e) => setSettings({ ...settings, send_button_bg_color: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="send_button_icon_color">Send Button Icon</Label>
+                      <Input
+                        id="send_button_icon_color"
+                        placeholder="#ffffff"
+                        value={settings.send_button_icon_color}
+                        onChange={(e) => setSettings({ ...settings, send_button_icon_color: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+{/* Fonts */}
+<div className="space-y-2 pt-4 border-t">
+  <Label>Fonts</Label>
+
+  <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label htmlFor="font_family">font-family</Label>
+      <Input
+        id="font_family"
+        placeholder='"Inter", system-ui, sans-serif'
+        value={settings.font_family}
+        onChange={(e) =>
+          setSettings({ ...settings, font_family: e.target.value })
+        }
+      />
+      <p className="text-xs text-muted-foreground">
+        CSS font-family string used in the widget.
+      </p>
+    </div>
+
+    <div className="space-y-2">
+      <Label htmlFor="font_css_url">Font CSS URL</Label>
+      <Input
+        id="font_css_url"
+        placeholder="https://fonts.googleapis.com/css2?..."
+        value={settings.font_css_url}
+        onChange={(e) =>
+          setSettings({ ...settings, font_css_url: e.target.value })
+        }
+      />
+      <p className="text-xs text-muted-foreground">
+        Optional: link to external CSS (e.g., Google Fonts).
+      </p>
+    </div>
+  </div>
+
+  <div className="grid grid-cols-2 gap-4 mt-4">
+    <div className="space-y-2">
+      <Label htmlFor="font_file_url">Font file URL (woff2/woff/ttf)</Label>
+      <Input
+        id="font_file_url"
+        placeholder="https://.../my-font.woff2"
+        value={settings.font_file_url}
+        onChange={(e) =>
+          setSettings({ ...settings, font_file_url: e.target.value })
+        }
+      />
+      <p className="text-xs text-muted-foreground">
+        This direct URL will be used to load the font (from Amazon AWS S3 storage).
+      </p>
+    </div>
+
+    <div className="space-y-2">
+      <Label>Upload font file</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          id="font_file_input"
+          type="file"
+          accept=".woff,.woff2,.ttf,.otf"
+          className="flex-1"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={fontUploading || !clientId}
+          onClick={async () => {
+            const input = document.getElementById(
+              "font_file_input"
+            ) as HTMLInputElement | null;
+            if (!input || !input.files || input.files.length === 0) {
+              alert("Please choose a font file first");
+              return;
+            }
+
+            const file = input.files[0];
+            const fd = new FormData();
+            fd.append("font", file);
+            // передадим siteId, чтобы на бэке можно было сделать тот же фильтр
+            fd.append("siteId", (settings.site_id || client?.siteId || ""));
+
+            try {
+              setFontUploading(true);
+              const resp = await fetch(
+                `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(
+                  clientId || ""
+                )}/widget-font`,
+                {
+                  method: "POST",
+                  body: fd,
+                  credentials: "omit",
+                }
+              );
+
+              const data = await resp.json();
+              if (!resp.ok || !data.ok) {
+                console.error("Font upload error", data);
+                toast.warning("Font upload failed", {
+                  description: data.error || "Unknown error",
+                  ...TOAST_WARNING,
+                });
+                return;
+              }
+
+              setSettings((prev) => ({
+                ...prev,
+                font_file_url: data.url || prev.font_file_url,
+              }));
+              toast.success("Font uploaded", {
+                description: "Font file URL was updated.",
+                ...TOAST_SUCCESS,
+              });
+            } catch (e: any) {
+              console.error("Font upload error", e);
+              toast.warning("Font upload failed", {
+                description: String(e?.message || e),
+                ...TOAST_WARNING,
+              });
+            } finally {
+              setFontUploading(false);
+            }
+          }}
+        >
+          {fontUploading ? "Uploading..." : "Upload"}
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        The uploaded file will be stored in S3 and its URL saved into the field on the left.
+      </p>
+    </div>
+  </div>
+</div>
+
+
+
 
 {/* Behavior */}
 <div className="space-y-2 pt-4 border-t">
@@ -2006,8 +2364,61 @@ btn.addEventListener('click', function (ev) {
         />
       </div>
     )}
+
+    {/* Дополнительные флаги поведения */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+      <div className="flex items-center justify-between rounded-md border p-3">
+        <div>
+          <div className="font-medium text-sm">Show avatars</div>
+          <div className="text-xs text-muted-foreground">Display assistant/user avatars in chat</div>
+        </div>
+        <Switch
+          checked={settings.show_avatars}
+          onCheckedChange={(v) => setSettings({ ...settings, show_avatars: !!v })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border p-3">
+        <div>
+          <div className="font-medium text-sm">Show timestamps</div>
+          <div className="text-xs text-muted-foreground">Display time under each message</div>
+        </div>
+        <Switch
+          checked={settings.show_timestamps}
+          onCheckedChange={(v) => setSettings({ ...settings, show_timestamps: !!v })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border p-3">
+        <div>
+          <div className="font-medium text-sm">Streaming answers</div>
+          <div className="text-xs text-muted-foreground">Stream assistant responses token-by-token</div>
+        </div>
+        <Switch
+          checked={settings.stream}
+          onCheckedChange={(v) => setSettings({ ...settings, stream: !!v })}
+        />
+      </div>
+    </div>
+  </div>
+
+  {/* Inline autostart (JSON) */}
+  <div className="space-y-1">
+    <Label htmlFor="inline_autostart_raw">Inline autostart script (JSON)</Label>
+    <Textarea
+      id="inline_autostart_raw"
+      rows={5}
+      className="font-mono text-xs"
+      placeholder='{"enabled":true,"mode":"cooldown","cooldownMinutes":60,"script":[{"text":"Hi!","delayMs":0}]}'
+      value={settings.inline_autostart_raw}
+      onChange={(e) => setSettings({ ...settings, inline_autostart_raw: e.target.value })}
+    />
+    <p className="text-xs text-muted-foreground">
+      Raw JSON for inline autostart scenario. Backend will validate &amp; parse it.
+    </p>
   </div>
 </div>
+
 
                   {/* System Prompt */}
                   <div className="space-y-2 pt-4 border-t">
