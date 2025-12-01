@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Send } from "lucide-react"; 
+import { Send } from "lucide-react";
 
 
 
@@ -39,12 +39,12 @@ const STATS_API_ROOT = "https://cloudcompliance.duckdns.org/api/statistic";
 
 // ===== Documents API helpers =====
 const DOCS_API = {
-  list:     (id: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents`,
-  upload:   (id: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents`,
+  list: (id: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents`,
+  upload: (id: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents`,
   download: (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/download`,
-  text:     (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/text`,
-  remove:   (id: string, docId: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}`,
-   preview:  (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/preview`,
+  text: (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/text`,
+  remove: (id: string, docId: string) => `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}`,
+  preview: (docId: string) => `${PUBLIC_API_ROOT}/client-documents/${encodeURIComponent(docId)}/preview`,
 };
 
 function isPdf(doc: DocDTO) {
@@ -138,7 +138,7 @@ type DocDTO = {
   size?: number;
   isActive?: boolean;
   createdAt?: string;
-   s3Url?: string;
+  s3Url?: string;
 };
 
 type DocumentDialog = {
@@ -207,7 +207,7 @@ function humanId(s?: string, left = 6, right = 4) {
    ========================= */
 function AnalyticsTab({ siteId }: { siteId?: string }) {
   const [days, setDays] = useState<number>(30);
-  const [bucket, setBucket] = useState<"hour"|"day"|"week">("day");
+  const [bucket, setBucket] = useState<"hour" | "day" | "week">("day");
   const [tz, setTz] = useState<string>("UTC");
 
   // Summary
@@ -244,36 +244,36 @@ function AnalyticsTab({ siteId }: { siteId?: string }) {
   const [gapsLoading, setGapsLoading] = useState(false);
 
   // 👇 ДОБАВЬ
-const [isSessDialogOpen, setIsSessDialogOpen] = useState(false);
-const [sessDialogSession, setSessDialogSession] = useState<SessionsListItem | null>(null);
-const [sessDialogLoading, setSessDialogLoading] = useState(false);
-const [sessDialogMsgs, setSessDialogMsgs] = useState<MessagesListItem[]>([]);
+  const [isSessDialogOpen, setIsSessDialogOpen] = useState(false);
+  const [sessDialogSession, setSessDialogSession] = useState<SessionsListItem | null>(null);
+  const [sessDialogLoading, setSessDialogLoading] = useState(false);
+  const [sessDialogMsgs, setSessDialogMsgs] = useState<MessagesListItem[]>([]);
 
 
-async function openSessionDialog(s: SessionsListItem) {
-  if (!siteId) return;
-  setSessDialogSession(s);
-  setIsSessDialogOpen(true);
-  setSessDialogLoading(true);
-  try {
-    const url = new URL(`${STATS_API_ROOT}/messages/list`);
-    url.searchParams.set("days", String(days));
-    url.searchParams.set("siteId", siteId);
-    url.searchParams.set("sessionId", s.sessionId);
-    url.searchParams.set("page", "1");
-    url.searchParams.set("limit", "200"); // хватит для одного диалога
-    const res = await fetch(url.toString());
-    const data = res.ok ? await res.json() : { items: [] };
-    // сортируем по времени возрастания — так привычнее читать переписку
-    const items: MessagesListItem[] = Array.isArray(data.items) ? data.items : [];
-    items.sort((a, b) => (new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()));
-    setSessDialogMsgs(items);
-  } catch {
-    setSessDialogMsgs([]);
-  } finally {
-    setSessDialogLoading(false);
+  async function openSessionDialog(s: SessionsListItem) {
+    if (!siteId) return;
+    setSessDialogSession(s);
+    setIsSessDialogOpen(true);
+    setSessDialogLoading(true);
+    try {
+      const url = new URL(`${STATS_API_ROOT}/messages/list`);
+      url.searchParams.set("days", String(days));
+      url.searchParams.set("siteId", siteId);
+      url.searchParams.set("sessionId", s.sessionId);
+      url.searchParams.set("page", "1");
+      url.searchParams.set("limit", "200"); // хватит для одного диалога
+      const res = await fetch(url.toString());
+      const data = res.ok ? await res.json() : { items: [] };
+      // сортируем по времени возрастания — так привычнее читать переписку
+      const items: MessagesListItem[] = Array.isArray(data.items) ? data.items : [];
+      items.sort((a, b) => (new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()));
+      setSessDialogMsgs(items);
+    } catch {
+      setSessDialogMsgs([]);
+    } finally {
+      setSessDialogLoading(false);
+    }
   }
-}
 
   const disabled = !siteId;
 
@@ -395,8 +395,8 @@ async function openSessionDialog(s: SessionsListItem) {
 
 
   const totalSessPages = Math.max(1, Math.ceil(sessionsTotalCount / sessLimit));
-  const totalMsgPages  = Math.max(1, Math.ceil(messagesTotalCount / msgLimit));
-  const totalGapPages  = Math.max(1, Math.ceil(gapsTotalCount / gapsLimit));
+  const totalMsgPages = Math.max(1, Math.ceil(messagesTotalCount / msgLimit));
+  const totalGapPages = Math.max(1, Math.ceil(gapsTotalCount / gapsLimit));
 
   return (
     <div className="space-y-6">
@@ -490,7 +490,7 @@ async function openSessionDialog(s: SessionsListItem) {
                 value={sessLimit}
                 onChange={(e) => { setSessLimit(Number(e.target.value)); setSessPage(1); }}
               >
-                {[10,20,50].map(n => <option key={n} value={n}>{n}</option>)}
+                {[10, 20, 50].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             </Field>
             <Button variant="outline" onClick={loadSessions}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
@@ -520,25 +520,25 @@ async function openSessionDialog(s: SessionsListItem) {
                   <tbody>
                     {sessions.map((s) => (
                       <tr key={s.sessionId} className="border-t hover:bg-muted/40">
-<td className="p-3 font-mono text-xs">
-  <button
-    className="text-primary hover:underline"
-    title={s.sessionId}
-    onClick={() => openSessionDialog(s)}
-  >
-    {humanId(s.sessionId)}
-  </button>
-</td>
-<td className="p-3 font-mono text-xs" title={s.visitorId || ""}>
-  {humanId(s.visitorId)}
-</td>
+                        <td className="p-3 font-mono text-xs">
+                          <button
+                            className="text-primary hover:underline"
+                            title={s.sessionId}
+                            onClick={() => openSessionDialog(s)}
+                          >
+                            {humanId(s.sessionId)}
+                          </button>
+                        </td>
+                        <td className="p-3 font-mono text-xs" title={s.visitorId || ""}>
+                          {humanId(s.visitorId)}
+                        </td>
                         <td className="p-3 text-xs text-muted-foreground">
                           {s.startedAt ? new Date(s.startedAt).toLocaleString() : "—"}
                         </td>
                         <td className="p-3 text-xs">
                           {s.messagesCount ?? 0} <span className="text-muted-foreground">({s.userMessages ?? 0}/{s.assistantMessages ?? 0})</span>
                         </td>
-                        <td className="p-3 text-xs">{s.lastUserQuestion ? (s.lastUserQuestion.length > 80 ? s.lastUserQuestion.slice(0,80) + "…" : s.lastUserQuestion) : "—"}</td>
+                        <td className="p-3 text-xs">{s.lastUserQuestion ? (s.lastUserQuestion.length > 80 ? s.lastUserQuestion.slice(0, 80) + "…" : s.lastUserQuestion) : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -548,11 +548,11 @@ async function openSessionDialog(s: SessionsListItem) {
               <div className="flex items-center justify-between mt-3">
                 <div className="text-xs text-muted-foreground">Total: {sessionsTotalCount}</div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" disabled={sessPage<=1} onClick={()=>setSessPage(p=>Math.max(1,p-1))}>
+                  <Button variant="outline" size="sm" disabled={sessPage <= 1} onClick={() => setSessPage(p => Math.max(1, p - 1))}>
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
                   <div className="text-sm">Page {sessPage} / {totalSessPages}</div>
-                  <Button variant="outline" size="sm" disabled={sessPage>=totalSessPages} onClick={()=>setSessPage(p=>Math.min(totalSessPages,p+1))}>
+                  <Button variant="outline" size="sm" disabled={sessPage >= totalSessPages} onClick={() => setSessPage(p => Math.min(totalSessPages, p + 1))}>
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
@@ -574,7 +574,7 @@ async function openSessionDialog(s: SessionsListItem) {
               <select
                 className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                 value={msgRole}
-                onChange={(e)=>{ setMsgRole(e.target.value as any); setMsgPage(1); }}
+                onChange={(e) => { setMsgRole(e.target.value as any); setMsgPage(1); }}
               >
                 <option value="">any</option>
                 <option value="user">user</option>
@@ -585,9 +585,9 @@ async function openSessionDialog(s: SessionsListItem) {
               <select
                 className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                 value={msgLimit}
-                onChange={(e)=>{ setMsgLimit(Number(e.target.value)); setMsgPage(1); }}
+                onChange={(e) => { setMsgLimit(Number(e.target.value)); setMsgPage(1); }}
               >
-                {[10,20,50].map(n => <option key={n} value={n}>{n}</option>)}
+                {[10, 20, 50].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             </Field>
             <Button variant="outline" onClick={loadMessages}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
@@ -623,7 +623,7 @@ async function openSessionDialog(s: SessionsListItem) {
                         <td className="p-3 font-mono text-xs">{m.sessionId}</td>
                         <td className="p-3 text-xs">{m.role}</td>
                         <td className="p-3 text-xs">
-                          {m.content ? (m.content.length > 120 ? m.content.slice(0,120) + "…" : m.content) : "—"}
+                          {m.content ? (m.content.length > 120 ? m.content.slice(0, 120) + "…" : m.content) : "—"}
                         </td>
                         <td className="p-3 text-xs">{typeof m.latencyMs === "number" ? `${m.latencyMs} ms` : "—"}</td>
                       </tr>
@@ -635,11 +635,11 @@ async function openSessionDialog(s: SessionsListItem) {
               <div className="flex items-center justify-between mt-3">
                 <div className="text-xs text-muted-foreground">Total: {messagesTotalCount}</div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" disabled={msgPage<=1} onClick={()=>setMsgPage(p=>Math.max(1,p-1))}>
+                  <Button variant="outline" size="sm" disabled={msgPage <= 1} onClick={() => setMsgPage(p => Math.max(1, p - 1))}>
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
                   <div className="text-sm">Page {msgPage} / {totalMsgPages}</div>
-                  <Button variant="outline" size="sm" disabled={msgPage>=totalMsgPages} onClick={()=>setMsgPage(p=>Math.min(totalMsgPages,p+1))}>
+                  <Button variant="outline" size="sm" disabled={msgPage >= totalMsgPages} onClick={() => setMsgPage(p => Math.min(totalMsgPages, p + 1))}>
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
@@ -656,12 +656,12 @@ async function openSessionDialog(s: SessionsListItem) {
             <CardTitle>Gaps</CardTitle>
             <CardDescription>Unanswered/low-confidence questions</CardDescription>
           </div>
-        <div className="flex items-end gap-3">
+          <div className="flex items-end gap-3">
             <Field label="Phase">
               <select
                 className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                 value={gapsPhase}
-                onChange={(e)=>{ setGapsPhase(e.target.value); setGapsPage(1); }}
+                onChange={(e) => { setGapsPhase(e.target.value); setGapsPage(1); }}
               >
                 <option value="">any</option>
                 <option value="no-context">no-context</option>
@@ -673,7 +673,7 @@ async function openSessionDialog(s: SessionsListItem) {
               <select
                 className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                 value={String(gapsOnlyUnresolved)}
-                onChange={(e)=>{ setGapsOnlyUnresolved(e.target.value === "true"); setGapsPage(1); }}
+                onChange={(e) => { setGapsOnlyUnresolved(e.target.value === "true"); setGapsPage(1); }}
               >
                 <option value="true">true</option>
                 <option value="false">false</option>
@@ -683,9 +683,9 @@ async function openSessionDialog(s: SessionsListItem) {
               <select
                 className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                 value={gapsLimit}
-                onChange={(e)=>{ setGapsLimit(Number(e.target.value)); setGapsPage(1); }}
+                onChange={(e) => { setGapsLimit(Number(e.target.value)); setGapsPage(1); }}
               >
-                {[10,20,50].map(n => <option key={n} value={n}>{n}</option>)}
+                {[10, 20, 50].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             </Field>
             <Button variant="outline" onClick={loadGaps}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
@@ -716,7 +716,7 @@ async function openSessionDialog(s: SessionsListItem) {
                     {gaps.map((g, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="p-3 text-xs">
-                          {g.question ? (g.question.length > 120 ? g.question.slice(0,120) + "…" : g.question) : "—"}
+                          {g.question ? (g.question.length > 120 ? g.question.slice(0, 120) + "…" : g.question) : "—"}
                         </td>
                         <td className="p-3 text-xs">{g.phase || "—"}</td>
                         <td className="p-3 text-xs">
@@ -735,11 +735,11 @@ async function openSessionDialog(s: SessionsListItem) {
               <div className="flex items-center justify-between mt-3">
                 <div className="text-xs text-muted-foreground">Total: {gapsTotalCount}</div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" disabled={gapsPage<=1} onClick={()=>setGapsPage(p=>Math.max(1,p-1))}>
+                  <Button variant="outline" size="sm" disabled={gapsPage <= 1} onClick={() => setGapsPage(p => Math.max(1, p - 1))}>
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
                   <div className="text-sm">Page {gapsPage} / {totalGapPages}</div>
-                  <Button variant="outline" size="sm" disabled={gapsPage>=totalGapPages} onClick={()=>setGapsPage(p=>Math.min(totalGapPages,p+1))}>
+                  <Button variant="outline" size="sm" disabled={gapsPage >= totalGapPages} onClick={() => setGapsPage(p => Math.min(totalGapPages, p + 1))}>
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
@@ -781,13 +781,12 @@ async function openSessionDialog(s: SessionsListItem) {
                 {sessDialogMsgs.map((m, i) => (
                   <li key={i} className="flex gap-2">
                     <div
-                      className={`px-2 py-1 rounded text-xs font-medium h-6 flex items-center ${
-                        m.role === "user"
+                      className={`px-2 py-1 rounded text-xs font-medium h-6 flex items-center ${m.role === "user"
                           ? "bg-blue-500/20 text-blue-300"
                           : m.role === "assistant"
-                          ? "bg-emerald-500/20 text-emerald-300"
-                          : "bg-zinc-500/20 text-zinc-200"
-                      }`}
+                            ? "bg-emerald-500/20 text-emerald-300"
+                            : "bg-zinc-500/20 text-zinc-200"
+                        }`}
                       title={m.role}
                     >
                       {m.role}
@@ -896,7 +895,7 @@ export default function AdminClientManage() {
     system_prompt: DEFAULT_SYSTEM_PROMPT,
   });
 
-const [fontUploading, setFontUploading] = useState(false);
+  const [fontUploading, setFontUploading] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
@@ -947,58 +946,58 @@ const [fontUploading, setFontUploading] = useState(false);
         if (clientId) {
           const cfgRes = await fetch(WIDGET_CFG_API.get(clientId), { credentials: "omit" });
           if (cfgRes.ok) {
-                        const { config } = await cfgRes.json();
+            const { config } = await cfgRes.json();
             const cfg = config || {};
 
             setSettings({
               // UI
-              widget_title:     cfg.widgetTitle      ?? "AI Assistant",
-              welcome_message:  cfg.welcomeMessage   ?? "Hi! How can I help you today?",
-              primary_color:    cfg.primaryColor     ?? "#2927ea",
-              background_color: cfg.backgroundColor  ?? "#0f0f0f",
-              text_color:       cfg.textColor        ?? "#ffffff",
-              border_color:     (cfg.borderColor ?? cfg.primaryColor ?? "#2927ea"),
-              logo_url:         cfg.logo?.url ?? null,
+              widget_title: cfg.widgetTitle ?? "AI Assistant",
+              welcome_message: cfg.welcomeMessage ?? "Hi! How can I help you today?",
+              primary_color: cfg.primaryColor ?? "#2927ea",
+              background_color: cfg.backgroundColor ?? "#0f0f0f",
+              text_color: cfg.textColor ?? "#ffffff",
+              border_color: (cfg.borderColor ?? cfg.primaryColor ?? "#2927ea"),
+              logo_url: cfg.logo?.url ?? null,
 
               // поведение / метаданные
-              site_id:          (cfg.siteId ?? data.siteId ?? ""),
-              lang:             (cfg.lang ?? "en"),
-              position:         (cfg.position ?? "br"),
+              site_id: (cfg.siteId ?? data.siteId ?? ""),
+              lang: (cfg.lang ?? "en"),
+              position: (cfg.position ?? "br"),
 
-              autostart:                !!cfg.autostart,
-              autostart_delay:          typeof cfg.autostartDelay === "number" ? cfg.autostartDelay : 5000,
-              autostart_mode:           (cfg.autostartMode ?? "local"),
-              autostart_message:        (cfg.autostartMessage ?? ""),
-              autostart_prompt:         (cfg.autostartPrompt ?? ""),
+              autostart: !!cfg.autostart,
+              autostart_delay: typeof cfg.autostartDelay === "number" ? cfg.autostartDelay : 5000,
+              autostart_mode: (cfg.autostartMode ?? "local"),
+              autostart_message: (cfg.autostartMessage ?? ""),
+              autostart_prompt: (cfg.autostartPrompt ?? ""),
               autostart_cooldown_hours: typeof cfg.autostartCooldownHours === "number" ? cfg.autostartCooldownHours : 12,
 
-              preserve_history:         cfg.preserveHistory ?? true,
-              reset_history_on_open:    !!cfg.resetHistoryOnOpen,
+              preserve_history: cfg.preserveHistory ?? true,
+              reset_history_on_open: !!cfg.resetHistoryOnOpen,
 
               // НОВЫЕ UI-поля (как есть из конфига)
-              input_placeholder:         cfg.inputPlaceholder        ?? "",
-              header_bg_color:           cfg.headerBackgroundColor   || "",
-              header_text_color:         cfg.headerTextColor         || "",
-              assistant_bubble_color:    cfg.assistantBubbleColor    || "",
+              input_placeholder: cfg.inputPlaceholder ?? "",
+              header_bg_color: cfg.headerBackgroundColor || "",
+              header_text_color: cfg.headerTextColor || "",
+              assistant_bubble_color: cfg.assistantBubbleColor || "",
               assistant_bubble_text_color: cfg.assistantBubbleTextColor || "",
-              user_bubble_color:         cfg.userBubbleColor         || "",
-              user_bubble_text_color:    cfg.userBubbleTextColor     || "",
-              bubble_border_color:       cfg.bubbleBorderColor       || "",
-              input_bg_color:            cfg.inputBackgroundColor    || "",
-              input_text_color:          cfg.inputTextColor          || "",
-              input_border_color:        cfg.inputBorderColor        || "",
-              send_button_bg_color:      cfg.sendButtonBackgroundColor || "",
-              send_button_icon_color:    cfg.sendButtonIconColor     || "",
-              show_avatars:              cfg.showAvatars !== false,
-              show_timestamps:           cfg.showTimestamps !== false,
+              user_bubble_color: cfg.userBubbleColor || "",
+              user_bubble_text_color: cfg.userBubbleTextColor || "",
+              bubble_border_color: cfg.bubbleBorderColor || "",
+              input_bg_color: cfg.inputBackgroundColor || "",
+              input_text_color: cfg.inputTextColor || "",
+              input_border_color: cfg.inputBorderColor || "",
+              send_button_bg_color: cfg.sendButtonBackgroundColor || "",
+              send_button_icon_color: cfg.sendButtonIconColor || "",
+              show_avatars: cfg.showAvatars !== false,
+              show_timestamps: cfg.showTimestamps !== false,
 
-              stream:                    cfg.stream !== false,
+              stream: cfg.stream !== false,
 
-              font_family:               cfg.fontFamily  || "",
-              font_css_url:              cfg.fontCssUrl  || "",
-              font_file_url:             cfg.fontFileUrl || "",
+              font_family: cfg.fontFamily || "",
+              font_css_url: cfg.fontCssUrl || "",
+              font_file_url: cfg.fontFileUrl || "",
 
-              inline_autostart_raw:      cfg.inlineAutostart
+              inline_autostart_raw: cfg.inlineAutostart
                 ? JSON.stringify(cfg.inlineAutostart, null, 2)
                 : "",
 
@@ -1024,6 +1023,7 @@ const [fontUploading, setFontUploading] = useState(false);
     })();
     return () => { alive = false; };
   }, [clientId]);
+
 
   // ===== Fetch REAL users of client =====
   useEffect(() => {
@@ -1071,7 +1071,7 @@ const [fontUploading, setFontUploading] = useState(false);
         size: typeof d.size === "number" ? d.size : d.fileSize,
         isActive: d.isActive ?? true,
         createdAt: d.createdAt || d.uploadedAt,
-          s3Url: d.s3Url,
+        s3Url: d.s3Url,
       }));
       setDocuments(mapped);
     } catch (e: any) {
@@ -1084,28 +1084,28 @@ const [fontUploading, setFontUploading] = useState(false);
   useEffect(() => { fetchDocuments(); /* eslint-disable-next-line */ }, [clientId]);
 
   // ===== Upload handlers =====
-const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  // проверяем тип
-  if (!/^image\/(png|jpeg)$/.test(file.type)) {
-    toast.warning("Only PNG or JPEG allowed", TOAST_WARNING);
-    return;
-  }
+    // проверяем тип
+    if (!/^image\/(png|jpeg)$/.test(file.type)) {
+      toast.warning("Only PNG or JPEG allowed", TOAST_WARNING);
+      return;
+    }
 
-  const reader = new FileReader();
-  reader.onloadend = () => setLogoPreview(String(reader.result));
-  reader.readAsDataURL(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setLogoPreview(String(reader.result));
+    reader.readAsDataURL(file);
 
-  setLogoFile(file); // <— сохраняем сам файл
-};
+    setLogoFile(file); // <— сохраняем сам файл
+  };
 
-const handleRemoveLogo = () => {
-  setLogoPreview(null);
-  setLogoFile(null);
-  // опционально можно завести флаг removeLogo = true
-};
+  const handleRemoveLogo = () => {
+    setLogoPreview(null);
+    setLogoFile(null);
+    // опционально можно завести флаг removeLogo = true
+  };
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1149,47 +1149,9 @@ const handleRemoveLogo = () => {
   }
 
   // ===== View / Download / Delete handlers =====
-async function handleViewDocumentById(doc: DocDTO) {
-  // 1) PDF
-  if (isPdf(doc)) {
-    setViewingDocument({
-      id: doc._id,
-      title: doc.title || doc.fileName,
-      file_name: doc.fileName,
-      is_active: !!doc.isActive,
-      created_at: doc.createdAt || new Date().toISOString(),
-      file_size: doc.size || 0,
-      contentType: doc.contentType,
-      mode: "pdf",
-      viewUrl: getPublicViewUrl(doc),
-    });
-    setIsViewDialogOpen(true);
-    return;
-  }
-
-  // 2) Image
-  if (isImage(doc)) {
-    setViewingDocument({
-      id: doc._id,
-      title: doc.title || doc.fileName,
-      file_name: doc.fileName,
-      is_active: !!doc.isActive,
-      created_at: doc.createdAt || new Date().toISOString(),
-      file_size: doc.size || 0,
-      contentType: doc.contentType,
-      mode: "image",
-      viewUrl: getPublicViewUrl(doc),
-    });
-    setIsViewDialogOpen(true);
-    return;
-  }
-
-  // 3) Text-like
-  if (isTextLike(doc)) {
-    try {
-      const res = await fetch(DOCS_API.text(doc._id), { credentials: "omit" });
-      const data = res.ok ? await res.json() : {};
-      const content = typeof data === "string" ? data : (data?.text ?? "");
+  async function handleViewDocumentById(doc: DocDTO) {
+    // 1) PDF
+    if (isPdf(doc)) {
       setViewingDocument({
         id: doc._id,
         title: doc.title || doc.fileName,
@@ -1198,19 +1160,73 @@ async function handleViewDocumentById(doc: DocDTO) {
         created_at: doc.createdAt || new Date().toISOString(),
         file_size: doc.size || 0,
         contentType: doc.contentType,
-        mode: "text",
-        content: content || "No preview available",
+        mode: "pdf",
+        viewUrl: getPublicViewUrl(doc),
       });
       setIsViewDialogOpen(true);
       return;
-    } catch {
-      // пойдём в unknown
     }
-  }
 
-  // 4) Office (docx/xlsx/pptx) — используем Google Viewer
-  if (isOffice(doc)) {
-    const raw = getPublicViewUrl(doc);
+    // 2) Image
+    if (isImage(doc)) {
+      setViewingDocument({
+        id: doc._id,
+        title: doc.title || doc.fileName,
+        file_name: doc.fileName,
+        is_active: !!doc.isActive,
+        created_at: doc.createdAt || new Date().toISOString(),
+        file_size: doc.size || 0,
+        contentType: doc.contentType,
+        mode: "image",
+        viewUrl: getPublicViewUrl(doc),
+      });
+      setIsViewDialogOpen(true);
+      return;
+    }
+
+    // 3) Text-like
+    if (isTextLike(doc)) {
+      try {
+        const res = await fetch(DOCS_API.text(doc._id), { credentials: "omit" });
+        const data = res.ok ? await res.json() : {};
+        const content = typeof data === "string" ? data : (data?.text ?? "");
+        setViewingDocument({
+          id: doc._id,
+          title: doc.title || doc.fileName,
+          file_name: doc.fileName,
+          is_active: !!doc.isActive,
+          created_at: doc.createdAt || new Date().toISOString(),
+          file_size: doc.size || 0,
+          contentType: doc.contentType,
+          mode: "text",
+          content: content || "No preview available",
+        });
+        setIsViewDialogOpen(true);
+        return;
+      } catch {
+        // пойдём в unknown
+      }
+    }
+
+    // 4) Office (docx/xlsx/pptx) — используем Google Viewer
+    if (isOffice(doc)) {
+      const raw = getPublicViewUrl(doc);
+      setViewingDocument({
+        id: doc._id,
+        title: doc.title || doc.fileName,
+        file_name: doc.fileName,
+        is_active: !!doc.isActive,
+        created_at: doc.createdAt || new Date().toISOString(),
+        file_size: doc.size || 0,
+        contentType: doc.contentType,
+        mode: "office",
+        viewUrl: asGoogleViewer(raw),
+      });
+      setIsViewDialogOpen(true);
+      return;
+    }
+
+    // 5) Fallback
     setViewingDocument({
       id: doc._id,
       title: doc.title || doc.fileName,
@@ -1219,36 +1235,20 @@ async function handleViewDocumentById(doc: DocDTO) {
       created_at: doc.createdAt || new Date().toISOString(),
       file_size: doc.size || 0,
       contentType: doc.contentType,
-      mode: "office",
-      viewUrl: asGoogleViewer(raw),
+      mode: "unknown",
     });
     setIsViewDialogOpen(true);
-    return;
   }
 
-  // 5) Fallback
-  setViewingDocument({
-    id: doc._id,
-    title: doc.title || doc.fileName,
-    file_name: doc.fileName,
-    is_active: !!doc.isActive,
-    created_at: doc.createdAt || new Date().toISOString(),
-    file_size: doc.size || 0,
-    contentType: doc.contentType,
-    mode: "unknown",
-  });
-  setIsViewDialogOpen(true);
-}
 
-
-function handleDownloadDocumentById(doc: DocDTO) {
-  const url = getDownloadUrl(doc);
-  if (!url) {
-    toast.warning("Download unavailable", { description: "s3Url is missing for this file.", ...TOAST_WARNING });
-    return;
+  function handleDownloadDocumentById(doc: DocDTO) {
+    const url = getDownloadUrl(doc);
+    if (!url) {
+      toast.warning("Download unavailable", { description: "s3Url is missing for this file.", ...TOAST_WARNING });
+      return;
+    }
+    window.open(url, "_blank", "noopener");
   }
-  window.open(url, "_blank", "noopener");
-}
 
 
   async function handleDeleteDocument(doc: DocDTO) {
@@ -1273,130 +1273,130 @@ function handleDownloadDocumentById(doc: DocDTO) {
   }
 
   // ===== Save (PUT /clients/:idOrSlug/widget-config) =====
-const handleSaveSettings = async () => {
-  if (!clientId) return;
-  setSaving(true);
-  setError(null);
+  const handleSaveSettings = async () => {
+    if (!clientId) return;
+    setSaving(true);
+    setError(null);
 
-  try {
-    // общие поля
-    const baseFields = {
-      widgetTitle:        settings.widget_title,
-      welcomeMessage:     settings.welcome_message,
-      primaryColor:       settings.primary_color,
-      borderColor:        (settings.border_color || settings.primary_color),
-      backgroundColor:    settings.background_color,
-      textColor:          settings.text_color,
+    try {
+      // общие поля
+      const baseFields = {
+        widgetTitle: settings.widget_title,
+        welcomeMessage: settings.welcome_message,
+        primaryColor: settings.primary_color,
+        borderColor: (settings.border_color || settings.primary_color),
+        backgroundColor: settings.background_color,
+        textColor: settings.text_color,
 
-      siteId:             (settings.site_id || "").trim(),
-      lang:               settings.lang,
-      position:           settings.position,
+        siteId: (settings.site_id || "").trim(),
+        lang: settings.lang,
+        position: settings.position,
 
-      // поведение
-      autostart:              !!settings.autostart,
-      autostartDelay:         Number(settings.autostart_delay) || 0,
-      autostartMode:          settings.autostart_mode,
-      autostartMessage:       settings.autostart_message,
-      autostartPrompt:        settings.autostart_prompt,
-      autostartCooldownHours: Number(settings.autostart_cooldown_hours) || 0,
+        // поведение
+        autostart: !!settings.autostart,
+        autostartDelay: Number(settings.autostart_delay) || 0,
+        autostartMode: settings.autostart_mode,
+        autostartMessage: settings.autostart_message,
+        autostartPrompt: settings.autostart_prompt,
+        autostartCooldownHours: Number(settings.autostart_cooldown_hours) || 0,
 
-      preserveHistory:        !!settings.preserve_history,
-      resetHistoryOnOpen:     !!settings.reset_history_on_open,
+        preserveHistory: !!settings.preserve_history,
+        resetHistoryOnOpen: !!settings.reset_history_on_open,
 
-      // НОВЫЕ UI-поля
-      inputPlaceholder:         settings.input_placeholder,
-      headerBackgroundColor:    settings.header_bg_color,
-      headerTextColor:          settings.header_text_color,
-      assistantBubbleColor:     settings.assistant_bubble_color,
-      assistantBubbleTextColor: settings.assistant_bubble_text_color,
-      userBubbleColor:          settings.user_bubble_color,
-      userBubbleTextColor:      settings.user_bubble_text_color,
-      bubbleBorderColor:        settings.bubble_border_color,
-      inputBackgroundColor:     settings.input_bg_color,
-      inputTextColor:           settings.input_text_color,
-      inputBorderColor:         settings.input_border_color,
-      sendButtonBackgroundColor: settings.send_button_bg_color,
-      sendButtonIconColor:       settings.send_button_icon_color,
-      showAvatars:              !!settings.show_avatars,
-      showTimestamps:           !!settings.show_timestamps,
+        // НОВЫЕ UI-поля
+        inputPlaceholder: settings.input_placeholder,
+        headerBackgroundColor: settings.header_bg_color,
+        headerTextColor: settings.header_text_color,
+        assistantBubbleColor: settings.assistant_bubble_color,
+        assistantBubbleTextColor: settings.assistant_bubble_text_color,
+        userBubbleColor: settings.user_bubble_color,
+        userBubbleTextColor: settings.user_bubble_text_color,
+        bubbleBorderColor: settings.bubble_border_color,
+        inputBackgroundColor: settings.input_bg_color,
+        inputTextColor: settings.input_text_color,
+        inputBorderColor: settings.input_border_color,
+        sendButtonBackgroundColor: settings.send_button_bg_color,
+        sendButtonIconColor: settings.send_button_icon_color,
+        showAvatars: !!settings.show_avatars,
+        showTimestamps: !!settings.show_timestamps,
 
-      stream:                   !!settings.stream,
+        stream: !!settings.stream,
 
-      // шрифты
-      fontFamily:  settings.font_family,
-      fontCssUrl:  settings.font_css_url,
-      fontFileUrl: settings.font_file_url,
+        // шрифты
+        fontFamily: settings.font_family,
+        fontCssUrl: settings.font_css_url,
+        fontFileUrl: settings.font_file_url,
 
-      // inline-автостарт — сырая строка, бэкенд сам распарсит
-      inlineAutostart: settings.inline_autostart_raw.trim() || "",
+        // inline-автостарт — сырая строка, бэкенд сам распарсит
+        inlineAutostart: settings.inline_autostart_raw.trim() || "",
 
-      // LLM
-      customSystemPrompt:     settings.system_prompt,
-      isActive:               true,
-    };
+        // LLM
+        customSystemPrompt: settings.system_prompt,
+        isActive: true,
+      };
 
 
-    let res: Response;
+      let res: Response;
 
-    if (logoFile) {
-      // === multipart/form-data ===
-      const fd = new FormData();
-      Object.entries(baseFields).forEach(([k, v]) => {
-        fd.append(k, typeof v === "string" ? v : JSON.stringify(v));
+      if (logoFile) {
+        // === multipart/form-data ===
+        const fd = new FormData();
+        Object.entries(baseFields).forEach(([k, v]) => {
+          fd.append(k, typeof v === "string" ? v : JSON.stringify(v));
+        });
+        fd.append("logo", logoFile); // <— ключ совпадает с multer-s3.single("logo")
+
+        res = await fetch(WIDGET_CFG_API.put(clientId), {
+          method: "PUT",
+          body: fd,
+          credentials: "omit",
+        });
+      } else {
+        // === обычный JSON ===
+        res = await fetch(WIDGET_CFG_API.put(clientId), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "omit",
+          body: JSON.stringify(baseFields),
+        });
+      }
+
+      if (!res.ok) throw new Error(await res.text());
+      const { config } = await res.json();
+
+      setSettings((prev) => ({
+        ...prev,
+        widget_title: config?.widgetTitle ?? prev.widget_title,
+        welcome_message: config?.welcomeMessage ?? prev.welcome_message,
+        primary_color: config?.primaryColor ?? prev.primary_color,
+        background_color: config?.backgroundColor ?? prev.background_color,
+        text_color: config?.textColor ?? prev.text_color,
+        border_color: config?.borderColor ?? prev.border_color,
+        logo_url: config?.logo?.url ?? prev.logo_url,
+        site_id: config?.siteId ?? prev.site_id,
+        system_prompt:
+          (config?.customSystemPrompt && String(config.customSystemPrompt).trim().length
+            ? config.customSystemPrompt
+            : prev.system_prompt),
+      }));
+
+      setLogoPreview(null);
+      setLogoFile(null);
+
+      toast.success("Saved", {
+        description: "Widget settings were updated successfully.",
+        ...TOAST_SUCCESS,
       });
-      fd.append("logo", logoFile); // <— ключ совпадает с multer-s3.single("logo")
-
-      res = await fetch(WIDGET_CFG_API.put(clientId), {
-        method: "PUT",
-        body: fd,
-        credentials: "omit",
+    } catch (e: any) {
+      setError(e?.message || "Failed to save settings");
+      toast.warning("Save failed", {
+        description: e?.message || "Please try again.",
+        ...TOAST_WARNING,
       });
-    } else {
-      // === обычный JSON ===
-      res = await fetch(WIDGET_CFG_API.put(clientId), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "omit",
-        body: JSON.stringify(baseFields),
-      });
+    } finally {
+      setSaving(false);
     }
-
-    if (!res.ok) throw new Error(await res.text());
-    const { config } = await res.json();
-
-    setSettings((prev) => ({
-      ...prev,
-      widget_title:     config?.widgetTitle      ?? prev.widget_title,
-      welcome_message:  config?.welcomeMessage   ?? prev.welcome_message,
-      primary_color:    config?.primaryColor     ?? prev.primary_color,
-      background_color: config?.backgroundColor  ?? prev.background_color,
-      text_color:       config?.textColor        ?? prev.text_color,
-      border_color:     config?.borderColor      ?? prev.border_color,
-      logo_url:         config?.logo?.url ?? prev.logo_url,
-      site_id:          config?.siteId ?? prev.site_id,
-      system_prompt:
-        (config?.customSystemPrompt && String(config.customSystemPrompt).trim().length
-          ? config.customSystemPrompt
-          : prev.system_prompt),
-    }));
-
-    setLogoPreview(null);
-    setLogoFile(null);
-
-    toast.success("Saved", {
-      description: "Widget settings were updated successfully.",
-      ...TOAST_SUCCESS,
-    });
-  } catch (e: any) {
-    setError(e?.message || "Failed to save settings");
-    toast.warning("Save failed", {
-      description: e?.message || "Please try again.",
-      ...TOAST_WARNING,
-    });
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
 
   // ===== Helper to inject preview HTML into iframe (REAL chat, no inner scrollbars) =====
@@ -1639,10 +1639,8 @@ function append(role, text){
   var row = document.createElement('div');
   row.className = 'row ' + (role === 'user' ? 'me' : 'ai');
 
-  // avatar
   row.appendChild(makeAvatar(role));
 
-  // bubble + meta
   var wrap = document.createElement('div');
   var bubble = document.createElement('div');
   bubble.className = 'bubble';
@@ -1650,15 +1648,20 @@ function append(role, text){
   meta.className = 'meta';
   meta.textContent = formatTime(Date.now());
 
+  if (role === 'assistant') {
+    text = normalizeAssistantText(text);
+  }
   bubble.textContent = text || '';
+
   wrap.appendChild(bubble);
   wrap.appendChild(meta);
-
   row.appendChild(wrap);
   messages.appendChild(row);
   scrollToBottom();
+
   return { row: row, bubble: bubble, meta: meta };
 }
+
 
 function showTyping(){
   var row = document.createElement('div');
@@ -1673,6 +1676,22 @@ function showTyping(){
   scrollToBottom();
   return row;
 }
+
+function normalizeAssistantText(t) {
+  if (!t) return '';
+  t = String(t);
+
+  // Разрешаем ведущие пробелы/переносы перед двоеточием
+  // и аккуратно вырезаем нашу служебную метку
+  t = t.replace(
+    /^\s*:\s*(heartbeat|ok|confirm|gap|no-context|no-data)\b[:\-\s]*/i,
+    ''
+  );
+
+  return t.trimStart();
+}
+
+
 
         async function sendMessage(){
           var text = (inp.value || '').trim(); if (!text) return;
@@ -1727,7 +1746,7 @@ if (sid && sid !== session.id) {
 }
                 const msg = data.reply || data.answer || data.message || data.text ||
                   (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || 'No response';
-                typingBubble.textContent = String(msg);
+                typingBubble.textContent = normalizeAssistantText(msg);
               }
             }
           } catch (e) {
@@ -1895,73 +1914,73 @@ btn.addEventListener('click', function (ev) {
                   <div className="space-y-2">
                     <Label htmlFor="welcome_message">Welcome Message</Label>
                     {/* Site ID */}
-<div className="space-y-2">
-  <Label htmlFor="site_id">Site ID</Label>
-  <Input
-    id="site_id"
-    placeholder="example.com or example.com::default"
-    value={settings.site_id}
-    onChange={(e) => setSettings({ ...settings, site_id: e.target.value })}
-  />
-  <p className="text-xs text-muted-foreground">
-    Used to associate sessions/messages with this client for analytics.
-  </p>
-</div>
+                    <div className="space-y-2">
+                      <Label htmlFor="site_id">Site ID</Label>
+                      <Input
+                        id="site_id"
+                        placeholder="example.com or example.com::default"
+                        value={settings.site_id}
+                        onChange={(e) => setSettings({ ...settings, site_id: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Used to associate sessions/messages with this client for analytics.
+                      </p>
+                    </div>
 
-<div className="grid grid-cols-2 gap-4">
-  {/* Language */}
-  <div className="space-y-2">
-    <Label htmlFor="lang">Language</Label>
-    <select
-      id="lang"
-      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-      value={settings.lang}
-      onChange={(e) => setSettings({ ...settings, lang: e.target.value })}
-    >
-      <option value="en">English (en)</option>
-      <option value="ru">Русский (ru)</option>
-    </select>
-  </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Language */}
+                      <div className="space-y-2">
+                        <Label htmlFor="lang">Language</Label>
+                        <select
+                          id="lang"
+                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          value={settings.lang}
+                          onChange={(e) => setSettings({ ...settings, lang: e.target.value })}
+                        >
+                          <option value="en">English (en)</option>
+                          <option value="ru">Русский (ru)</option>
+                        </select>
+                      </div>
 
-  {/* Position */}
-  <div className="space-y-2">
-    <Label htmlFor="position">Widget Position</Label>
-    <select
-      id="position"
-      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-      value={settings.position}
-      onChange={(e) => setSettings({ ...settings, position: e.target.value as "br" | "bl" })}
-    >
-      <option value="br">Bottom Right</option>
-      <option value="bl">Bottom Left</option>
-    </select>
-  </div>
-</div>
-<div className="space-y-2">
-  <Label htmlFor="welcome_message">Welcome Message</Label>
-  <Input
-    id="welcome_message"
-    placeholder="Hi! How can I help you today?"
-    value={settings.welcome_message}
-    onChange={(e) => setSettings({ ...settings, welcome_message: e.target.value })}
-  />
-  <p className="text-xs text-muted-foreground">
-    This is the initial greeting the widget displays when opened.
-  </p>
-</div>
+                      {/* Position */}
+                      <div className="space-y-2">
+                        <Label htmlFor="position">Widget Position</Label>
+                        <select
+                          id="position"
+                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          value={settings.position}
+                          onChange={(e) => setSettings({ ...settings, position: e.target.value as "br" | "bl" })}
+                        >
+                          <option value="br">Bottom Right</option>
+                          <option value="bl">Bottom Left</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="welcome_message">Welcome Message</Label>
+                      <Input
+                        id="welcome_message"
+                        placeholder="Hi! How can I help you today?"
+                        value={settings.welcome_message}
+                        onChange={(e) => setSettings({ ...settings, welcome_message: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        This is the initial greeting the widget displays when opened.
+                      </p>
+                    </div>
 
-<div className="space-y-2">
-  <Label htmlFor="input_placeholder">Input Placeholder</Label>
-  <Input
-    id="input_placeholder"
-    placeholder="Type your message..."
-    value={settings.input_placeholder}
-    onChange={(e) => setSettings({ ...settings, input_placeholder: e.target.value })}
-  />
-  <p className="text-xs text-muted-foreground">
-    Placeholder text inside the message input. Leave empty to use a default per language.
-  </p>
-</div>
+                    <div className="space-y-2">
+                      <Label htmlFor="input_placeholder">Input Placeholder</Label>
+                      <Input
+                        id="input_placeholder"
+                        placeholder="Type your message..."
+                        value={settings.input_placeholder}
+                        onChange={(e) => setSettings({ ...settings, input_placeholder: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Placeholder text inside the message input. Leave empty to use a default per language.
+                      </p>
+                    </div>
 
                   </div>
 
@@ -2122,302 +2141,302 @@ btn.addEventListener('click', function (ev) {
                     </div>
                   </div>
 
-{/* Fonts */}
-<div className="space-y-2 pt-4 border-t">
-  <Label>Fonts</Label>
+                  {/* Fonts */}
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label>Fonts</Label>
 
-  <div className="grid grid-cols-2 gap-4">
-    <div className="space-y-2">
-      <Label htmlFor="font_family">font-family</Label>
-      <Input
-        id="font_family"
-        placeholder='"Inter", system-ui, sans-serif'
-        value={settings.font_family}
-        onChange={(e) =>
-          setSettings({ ...settings, font_family: e.target.value })
-        }
-      />
-      <p className="text-xs text-muted-foreground">
-        CSS font-family string used in the widget.
-      </p>
-    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="font_family">font-family</Label>
+                        <Input
+                          id="font_family"
+                          placeholder='"Inter", system-ui, sans-serif'
+                          value={settings.font_family}
+                          onChange={(e) =>
+                            setSettings({ ...settings, font_family: e.target.value })
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          CSS font-family string used in the widget.
+                        </p>
+                      </div>
 
-    <div className="space-y-2">
-      <Label htmlFor="font_css_url">Font CSS URL</Label>
-      <Input
-        id="font_css_url"
-        placeholder="https://fonts.googleapis.com/css2?..."
-        value={settings.font_css_url}
-        onChange={(e) =>
-          setSettings({ ...settings, font_css_url: e.target.value })
-        }
-      />
-      <p className="text-xs text-muted-foreground">
-        Optional: link to external CSS (e.g., Google Fonts).
-      </p>
-    </div>
-  </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="font_css_url">Font CSS URL</Label>
+                        <Input
+                          id="font_css_url"
+                          placeholder="https://fonts.googleapis.com/css2?..."
+                          value={settings.font_css_url}
+                          onChange={(e) =>
+                            setSettings({ ...settings, font_css_url: e.target.value })
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Optional: link to external CSS (e.g., Google Fonts).
+                        </p>
+                      </div>
+                    </div>
 
-  <div className="grid grid-cols-2 gap-4 mt-4">
-    <div className="space-y-2">
-      <Label htmlFor="font_file_url">Font file URL (woff2/woff/ttf)</Label>
-      <Input
-        id="font_file_url"
-        placeholder="https://.../my-font.woff2"
-        value={settings.font_file_url}
-        onChange={(e) =>
-          setSettings({ ...settings, font_file_url: e.target.value })
-        }
-      />
-      <p className="text-xs text-muted-foreground">
-        This direct URL will be used to load the font (from Amazon AWS S3 storage).
-      </p>
-    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="font_file_url">Font file URL (woff2/woff/ttf)</Label>
+                        <Input
+                          id="font_file_url"
+                          placeholder="https://.../my-font.woff2"
+                          value={settings.font_file_url}
+                          onChange={(e) =>
+                            setSettings({ ...settings, font_file_url: e.target.value })
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          This direct URL will be used to load the font (from Amazon AWS S3 storage).
+                        </p>
+                      </div>
 
-    <div className="space-y-2">
-      <Label>Upload font file</Label>
-      <div className="flex items-center gap-2">
-        <Input
-          id="font_file_input"
-          type="file"
-          accept=".woff,.woff2,.ttf,.otf"
-          className="flex-1"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={fontUploading || !clientId}
-          onClick={async () => {
-            const input = document.getElementById(
-              "font_file_input"
-            ) as HTMLInputElement | null;
-            if (!input || !input.files || input.files.length === 0) {
-              alert("Please choose a font file first");
-              return;
-            }
+                      <div className="space-y-2">
+                        <Label>Upload font file</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="font_file_input"
+                            type="file"
+                            accept=".woff,.woff2,.ttf,.otf"
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={fontUploading || !clientId}
+                            onClick={async () => {
+                              const input = document.getElementById(
+                                "font_file_input"
+                              ) as HTMLInputElement | null;
+                              if (!input || !input.files || input.files.length === 0) {
+                                alert("Please choose a font file first");
+                                return;
+                              }
 
-            const file = input.files[0];
-            const fd = new FormData();
-            fd.append("font", file);
-            // передадим siteId, чтобы на бэке можно было сделать тот же фильтр
-            fd.append("siteId", (settings.site_id || client?.siteId || ""));
+                              const file = input.files[0];
+                              const fd = new FormData();
+                              fd.append("font", file);
+                              // передадим siteId, чтобы на бэке можно было сделать тот же фильтр
+                              fd.append("siteId", (settings.site_id || client?.siteId || ""));
 
-            try {
-              setFontUploading(true);
-              const resp = await fetch(
-                `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(
-                  clientId || ""
-                )}/widget-font`,
-                {
-                  method: "POST",
-                  body: fd,
-                  credentials: "omit",
-                }
-              );
+                              try {
+                                setFontUploading(true);
+                                const resp = await fetch(
+                                  `${PUBLIC_API_ROOT}/clients/${encodeURIComponent(
+                                    clientId || ""
+                                  )}/widget-font`,
+                                  {
+                                    method: "POST",
+                                    body: fd,
+                                    credentials: "omit",
+                                  }
+                                );
 
-              const data = await resp.json();
-              if (!resp.ok || !data.ok) {
-                console.error("Font upload error", data);
-                toast.warning("Font upload failed", {
-                  description: data.error || "Unknown error",
-                  ...TOAST_WARNING,
-                });
-                return;
-              }
+                                const data = await resp.json();
+                                if (!resp.ok || !data.ok) {
+                                  console.error("Font upload error", data);
+                                  toast.warning("Font upload failed", {
+                                    description: data.error || "Unknown error",
+                                    ...TOAST_WARNING,
+                                  });
+                                  return;
+                                }
 
-              setSettings((prev) => ({
-                ...prev,
-                font_file_url: data.url || prev.font_file_url,
-              }));
-              toast.success("Font uploaded", {
-                description: "Font file URL was updated.",
-                ...TOAST_SUCCESS,
-              });
-            } catch (e: any) {
-              console.error("Font upload error", e);
-              toast.warning("Font upload failed", {
-                description: String(e?.message || e),
-                ...TOAST_WARNING,
-              });
-            } finally {
-              setFontUploading(false);
-            }
-          }}
-        >
-          {fontUploading ? "Uploading..." : "Upload"}
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        The uploaded file will be stored in S3 and its URL saved into the field on the left.
-      </p>
-    </div>
-  </div>
-</div>
-
-
+                                setSettings((prev) => ({
+                                  ...prev,
+                                  font_file_url: data.url || prev.font_file_url,
+                                }));
+                                toast.success("Font uploaded", {
+                                  description: "Font file URL was updated.",
+                                  ...TOAST_SUCCESS,
+                                });
+                              } catch (e: any) {
+                                console.error("Font upload error", e);
+                                toast.warning("Font upload failed", {
+                                  description: String(e?.message || e),
+                                  ...TOAST_WARNING,
+                                });
+                              } finally {
+                                setFontUploading(false);
+                              }
+                            }}
+                          >
+                            {fontUploading ? "Uploading..." : "Upload"}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          The uploaded file will be stored in S3 and its URL saved into the field on the left.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
 
-{/* Behavior */}
-<div className="space-y-2 pt-4 border-t">
-  <Label>Behavior</Label>
 
-  {/* Preserve / Reset */}
-  <div className="grid grid-cols-2 gap-4">
-    <div className="flex items-center justify-between rounded-md border p-3">
-      <div>
-        <div className="font-medium text-sm">Preserve History</div>
-        <div className="text-xs text-muted-foreground">Keep chat in localStorage</div>
-      </div>
-      <Switch
-        checked={settings.preserve_history}
-        onCheckedChange={(v) => setSettings({ ...settings, preserve_history: !!v })}
-      />
-    </div>
 
-    <div className="flex items-center justify-between rounded-md border p-3">
-      <div>
-        <div className="font-medium text-sm">Reset History on Open</div>
-        <div className="text-xs text-muted-foreground">Clear chat every open</div>
-      </div>
-      <Switch
-        checked={settings.reset_history_on_open}
-        onCheckedChange={(v) => setSettings({ ...settings, reset_history_on_open: !!v })}
-      />
-    </div>
-  </div>
+                  {/* Behavior */}
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label>Behavior</Label>
 
-  {/* Autostart */}
-  <div className="rounded-md border p-3 space-y-3">
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="font-medium text-sm">Autostart</div>
-        <div className="text-xs text-muted-foreground">Show first message automatically</div>
-      </div>
-      <Switch
-        checked={settings.autostart}
-        onCheckedChange={(v) => setSettings({ ...settings, autostart: !!v })}
-      />
-    </div>
+                    {/* Preserve / Reset */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center justify-between rounded-md border p-3">
+                        <div>
+                          <div className="font-medium text-sm">Preserve History</div>
+                          <div className="text-xs text-muted-foreground">Keep chat in localStorage</div>
+                        </div>
+                        <Switch
+                          checked={settings.preserve_history}
+                          onCheckedChange={(v) => setSettings({ ...settings, preserve_history: !!v })}
+                        />
+                      </div>
 
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div className="space-y-1">
-        <Label htmlFor="autostart_mode">Mode</Label>
-        <select
-          id="autostart_mode"
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-          value={settings.autostart_mode}
-          onChange={(e) => setSettings({ ...settings, autostart_mode: e.target.value as "local" | "ai" })}
-          disabled={!settings.autostart}
-        >
-          <option value="local">local</option>
-          <option value="ai">ai</option>
-        </select>
-      </div>
+                      <div className="flex items-center justify-between rounded-md border p-3">
+                        <div>
+                          <div className="font-medium text-sm">Reset History on Open</div>
+                          <div className="text-xs text-muted-foreground">Clear chat every open</div>
+                        </div>
+                        <Switch
+                          checked={settings.reset_history_on_open}
+                          onCheckedChange={(v) => setSettings({ ...settings, reset_history_on_open: !!v })}
+                        />
+                      </div>
+                    </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="autostart_delay">Delay (ms)</Label>
-        <Input
-          id="autostart_delay"
-          type="number"
-          min={0}
-          value={settings.autostart_delay}
-          onChange={(e) => setSettings({ ...settings, autostart_delay: Number(e.target.value || 0) })}
-          disabled={!settings.autostart}
-        />
-      </div>
+                    {/* Autostart */}
+                    <div className="rounded-md border p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-sm">Autostart</div>
+                          <div className="text-xs text-muted-foreground">Show first message automatically</div>
+                        </div>
+                        <Switch
+                          checked={settings.autostart}
+                          onCheckedChange={(v) => setSettings({ ...settings, autostart: !!v })}
+                        />
+                      </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="autostart_cooldown">Cooldown (hours)</Label>
-        <Input
-          id="autostart_cooldown"
-          type="number"
-          min={0}
-          value={settings.autostart_cooldown_hours}
-          onChange={(e) => setSettings({ ...settings, autostart_cooldown_hours: Number(e.target.value || 0) })}
-          disabled={!settings.autostart}
-        />
-      </div>
-    </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="space-y-1">
+                          <Label htmlFor="autostart_mode">Mode</Label>
+                          <select
+                            id="autostart_mode"
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            value={settings.autostart_mode}
+                            onChange={(e) => setSettings({ ...settings, autostart_mode: e.target.value as "local" | "ai" })}
+                            disabled={!settings.autostart}
+                          >
+                            <option value="local">local</option>
+                            <option value="ai">ai</option>
+                          </select>
+                        </div>
 
-    {settings.autostart_mode === "local" ? (
-      <div className="space-y-1">
-        <Label htmlFor="autostart_message">Autostart Message (local mode)</Label>
-        <Input
-          id="autostart_message"
-          value={settings.autostart_message}
-          onChange={(e) => setSettings({ ...settings, autostart_message: e.target.value })}
-          disabled={!settings.autostart}
-          placeholder="Hello! Need help choosing a plan?"
-        />
-      </div>
-    ) : (
-      <div className="space-y-1">
-        <Label htmlFor="autostart_prompt">Autostart Prompt (AI mode)</Label>
-        <Textarea
-          id="autostart_prompt"
-          rows={3}
-          value={settings.autostart_prompt}
-          onChange={(e) => setSettings({ ...settings, autostart_prompt: e.target.value })}
-          disabled={!settings.autostart}
-          placeholder="Write a warm opening message for a first-time visitor…"
-        />
-      </div>
-    )}
+                        <div className="space-y-1">
+                          <Label htmlFor="autostart_delay">Delay (ms)</Label>
+                          <Input
+                            id="autostart_delay"
+                            type="number"
+                            min={0}
+                            value={settings.autostart_delay}
+                            onChange={(e) => setSettings({ ...settings, autostart_delay: Number(e.target.value || 0) })}
+                            disabled={!settings.autostart}
+                          />
+                        </div>
 
-    {/* Дополнительные флаги поведения */}
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-      <div className="flex items-center justify-between rounded-md border p-3">
-        <div>
-          <div className="font-medium text-sm">Show avatars</div>
-          <div className="text-xs text-muted-foreground">Display assistant/user avatars in chat</div>
-        </div>
-        <Switch
-          checked={settings.show_avatars}
-          onCheckedChange={(v) => setSettings({ ...settings, show_avatars: !!v })}
-        />
-      </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="autostart_cooldown">Cooldown (hours)</Label>
+                          <Input
+                            id="autostart_cooldown"
+                            type="number"
+                            min={0}
+                            value={settings.autostart_cooldown_hours}
+                            onChange={(e) => setSettings({ ...settings, autostart_cooldown_hours: Number(e.target.value || 0) })}
+                            disabled={!settings.autostart}
+                          />
+                        </div>
+                      </div>
 
-      <div className="flex items-center justify-between rounded-md border p-3">
-        <div>
-          <div className="font-medium text-sm">Show timestamps</div>
-          <div className="text-xs text-muted-foreground">Display time under each message</div>
-        </div>
-        <Switch
-          checked={settings.show_timestamps}
-          onCheckedChange={(v) => setSettings({ ...settings, show_timestamps: !!v })}
-        />
-      </div>
+                      {settings.autostart_mode === "local" ? (
+                        <div className="space-y-1">
+                          <Label htmlFor="autostart_message">Autostart Message (local mode)</Label>
+                          <Input
+                            id="autostart_message"
+                            value={settings.autostart_message}
+                            onChange={(e) => setSettings({ ...settings, autostart_message: e.target.value })}
+                            disabled={!settings.autostart}
+                            placeholder="Hello! Need help choosing a plan?"
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <Label htmlFor="autostart_prompt">Autostart Prompt (AI mode)</Label>
+                          <Textarea
+                            id="autostart_prompt"
+                            rows={3}
+                            value={settings.autostart_prompt}
+                            onChange={(e) => setSettings({ ...settings, autostart_prompt: e.target.value })}
+                            disabled={!settings.autostart}
+                            placeholder="Write a warm opening message for a first-time visitor…"
+                          />
+                        </div>
+                      )}
 
-      <div className="flex items-center justify-between rounded-md border p-3">
-        <div>
-          <div className="font-medium text-sm">Streaming answers</div>
-          <div className="text-xs text-muted-foreground">Stream assistant responses token-by-token</div>
-        </div>
-        <Switch
-          checked={settings.stream}
-          onCheckedChange={(v) => setSettings({ ...settings, stream: !!v })}
-        />
-      </div>
-    </div>
-  </div>
+                      {/* Дополнительные флаги поведения */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                        <div className="flex items-center justify-between rounded-md border p-3">
+                          <div>
+                            <div className="font-medium text-sm">Show avatars</div>
+                            <div className="text-xs text-muted-foreground">Display assistant/user avatars in chat</div>
+                          </div>
+                          <Switch
+                            checked={settings.show_avatars}
+                            onCheckedChange={(v) => setSettings({ ...settings, show_avatars: !!v })}
+                          />
+                        </div>
 
-  {/* Inline autostart (JSON) */}
-  <div className="space-y-1">
-    <Label htmlFor="inline_autostart_raw">Inline autostart script (JSON)</Label>
-    <Textarea
-      id="inline_autostart_raw"
-      rows={5}
-      className="font-mono text-xs"
-      placeholder='{"enabled":true,"mode":"cooldown","cooldownMinutes":60,"script":[{"text":"Hi!","delayMs":0}]}'
-      value={settings.inline_autostart_raw}
-      onChange={(e) => setSettings({ ...settings, inline_autostart_raw: e.target.value })}
-    />
-    <p className="text-xs text-muted-foreground">
-      Raw JSON for inline autostart scenario. Backend will validate &amp; parse it.
-    </p>
-  </div>
-</div>
+                        <div className="flex items-center justify-between rounded-md border p-3">
+                          <div>
+                            <div className="font-medium text-sm">Show timestamps</div>
+                            <div className="text-xs text-muted-foreground">Display time under each message</div>
+                          </div>
+                          <Switch
+                            checked={settings.show_timestamps}
+                            onCheckedChange={(v) => setSettings({ ...settings, show_timestamps: !!v })}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-md border p-3">
+                          <div>
+                            <div className="font-medium text-sm">Streaming answers</div>
+                            <div className="text-xs text-muted-foreground">Stream assistant responses token-by-token</div>
+                          </div>
+                          <Switch
+                            checked={settings.stream}
+                            onCheckedChange={(v) => setSettings({ ...settings, stream: !!v })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Inline autostart (JSON) */}
+                    <div className="space-y-1">
+                      <Label htmlFor="inline_autostart_raw">Inline autostart script (JSON)</Label>
+                      <Textarea
+                        id="inline_autostart_raw"
+                        rows={5}
+                        className="font-mono text-xs"
+                        placeholder='{"enabled":true,"mode":"cooldown","cooldownMinutes":60,"script":[{"text":"Hi!","delayMs":0}]}'
+                        value={settings.inline_autostart_raw}
+                        onChange={(e) => setSettings({ ...settings, inline_autostart_raw: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Raw JSON for inline autostart scenario. Backend will validate &amp; parse it.
+                      </p>
+                    </div>
+                  </div>
 
 
                   {/* System Prompt */}
@@ -2453,7 +2472,7 @@ btn.addEventListener('click', function (ev) {
                 </CardContent>
               </Card>
             </TabsContent>
-            
+
 
             {/* Knowledge Base */}
             <TabsContent value="knowledge" className="space-y-6">
@@ -2693,32 +2712,37 @@ btn.addEventListener('click', function (ev) {
               </Card>
             </TabsContent>
 
-            {/* Demo */}
-            <TabsContent value="demo">
-              <Card className="bg-[#0a0a0a] border-gray-800">
-                <CardHeader>
-                  <CardTitle className="text-gray-100">Widget Preview</CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Test your AI chat widget in action.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div
-                    className="border border-gray-800 rounded-lg overflow-hidden"
-                    style={{ height: "600px", backgroundColor: "#1a1a1a" }}
-                  >
-                    <iframe
-                      ref={previewRef}
-                      title="Widget Demo"
-                      src="about:blank"
-                      className="w-full h-full"
-                      onLoad={injectPreview}
-                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-popups-to-escape-sandbox"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+{/* Demo */}
+<TabsContent value="demo">
+  <Card className="bg-[#0a0a0a] border-gray-800 overflow-visible">
+    <CardHeader>
+      <CardTitle className="text-gray-100">Widget Preview</CardTitle>
+      <CardDescription className="text-gray-400">
+        Test your AI chat widget in action.
+      </CardDescription>
+    </CardHeader>
+
+    {/* убираем дефолтный паддинг CardContent и задаём свой */}
+    <CardContent className="p-0">
+      <div className="p-6">
+        <iframe
+          key={settings.site_id || client?.siteId}
+          src={
+            "https://cloudcompliance.duckdns.org/aiw/widget-frame.html" +
+            `?siteId=${encodeURIComponent(settings.site_id || client?.siteId)}` +
+            "&mode=inline&fit=container"
+          }
+          className="w-full h-[600px] block"
+          style={{ border: "none" }}
+          title="AI Widget Preview"
+        />
+      </div>
+    </CardContent>
+  </Card>
+</TabsContent>
+
+
+
 
             {/* Analytics (NEW) */}
             <TabsContent value="analytics">
@@ -2727,92 +2751,92 @@ btn.addEventListener('click', function (ev) {
           </Tabs>
 
           {/* View Document Dialog */}
-<Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-  <DialogContent className="max-w-5xl max-h-[85vh]">
-    <DialogHeader>
-      <DialogTitle>{viewingDocument?.title}</DialogTitle>
-      <DialogDescription>
-        {viewingDocument?.file_name} •{" "}
-        {viewingDocument?.file_size ? (viewingDocument.file_size / 1024).toFixed(1) : 0} KB
-        {viewingDocument?.contentType ? ` • ${viewingDocument.contentType}` : ""}
-      </DialogDescription>
-    </DialogHeader>
+          <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+            <DialogContent className="max-w-5xl max-h-[85vh]">
+              <DialogHeader>
+                <DialogTitle>{viewingDocument?.title}</DialogTitle>
+                <DialogDescription>
+                  {viewingDocument?.file_name} •{" "}
+                  {viewingDocument?.file_size ? (viewingDocument.file_size / 1024).toFixed(1) : 0} KB
+                  {viewingDocument?.contentType ? ` • ${viewingDocument.contentType}` : ""}
+                </DialogDescription>
+              </DialogHeader>
 
-    <div className="h-[65vh] border rounded overflow-hidden bg-muted/20">
-      {viewingDocument?.mode === "pdf" && viewingDocument.viewUrl && (
-        <iframe
-          title="Preview PDF"
-          src={viewingDocument.viewUrl}
-          className="w-full h-full"
-        />
-      )}
+              <div className="h-[65vh] border rounded overflow-hidden bg-muted/20">
+                {viewingDocument?.mode === "pdf" && viewingDocument.viewUrl && (
+                  <iframe
+                    title="Preview PDF"
+                    src={viewingDocument.viewUrl}
+                    className="w-full h-full"
+                  />
+                )}
 
-      {viewingDocument?.mode === "image" && viewingDocument.viewUrl && (
-        <div className="w-full h-full flex items-center justify-center bg-black/50">
-          <img
-            src={viewingDocument.viewUrl}
-            alt={viewingDocument.title}
-            className="max-h-full max-w-full object-contain"
-          />
-        </div>
-      )}
+                {viewingDocument?.mode === "image" && viewingDocument.viewUrl && (
+                  <div className="w-full h-full flex items-center justify-center bg-black/50">
+                    <img
+                      src={viewingDocument.viewUrl}
+                      alt={viewingDocument.title}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  </div>
+                )}
 
-      {viewingDocument?.mode === "text" && (
-        <ScrollArea className="h-full w-full p-4">
-          <pre className="whitespace-pre-wrap font-mono text-sm">
-            {viewingDocument.content || "No content"}
-          </pre>
-        </ScrollArea>
-      )}
+                {viewingDocument?.mode === "text" && (
+                  <ScrollArea className="h-full w-full p-4">
+                    <pre className="whitespace-pre-wrap font-mono text-sm">
+                      {viewingDocument.content || "No content"}
+                    </pre>
+                  </ScrollArea>
+                )}
 
-      {viewingDocument?.mode === "office" && viewingDocument.viewUrl && (
-        <iframe
-          title="Preview Document"
-          src={viewingDocument.viewUrl}
-          className="w-full h-full"
-        />
-      )}
+                {viewingDocument?.mode === "office" && viewingDocument.viewUrl && (
+                  <iframe
+                    title="Preview Document"
+                    src={viewingDocument.viewUrl}
+                    className="w-full h-full"
+                  />
+                )}
 
-      {viewingDocument?.mode === "unknown" && (
-        <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
-          Preview not available. Use Download.
-        </div>
-      )}
-    </div>
+                {viewingDocument?.mode === "unknown" && (
+                  <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+                    Preview not available. Use Download.
+                  </div>
+                )}
+              </div>
 
-    <div className="flex justify-end gap-2">
-      <Button
-        variant="outline"
-        onClick={() =>
-          viewingDocument &&
-          window.open(
-            getPublicViewUrl(documents.find(d => d._id === viewingDocument.id) || { _id: viewingDocument.id } as DocDTO),
-            "_blank",
-            "noopener"
-          )
-        }
-      >
-        <ExternalLink className="w-4 h-4 mr-2" />
-        Open in new tab
-      </Button>
-<Button
-  onClick={() => {
-    if (!viewingDocument) return;
-    const doc = documents.find(d => d._id === viewingDocument.id);
-    if (!doc || !doc.s3Url) {
-      toast.warning("Download unavailable", { description: "s3Url is missing for this file.", ...TOAST_WARNING });
-      return;
-    }
-    const url = getDownloadUrl(doc);
-    window.open(url, "_blank", "noopener");
-  }}
->
-  <Download className="w-4 h-4 mr-2" />
-  Download
-</Button>
-    </div>
-  </DialogContent>
-</Dialog>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    viewingDocument &&
+                    window.open(
+                      getPublicViewUrl(documents.find(d => d._id === viewingDocument.id) || { _id: viewingDocument.id } as DocDTO),
+                      "_blank",
+                      "noopener"
+                    )
+                  }
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open in new tab
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!viewingDocument) return;
+                    const doc = documents.find(d => d._id === viewingDocument.id);
+                    if (!doc || !doc.s3Url) {
+                      toast.warning("Download unavailable", { description: "s3Url is missing for this file.", ...TOAST_WARNING });
+                      return;
+                    }
+                    const url = getDownloadUrl(doc);
+                    window.open(url, "_blank", "noopener");
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
     </div>
