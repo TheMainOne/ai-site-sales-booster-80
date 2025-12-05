@@ -44,7 +44,7 @@ interface Stats {
 }
 
 // !!! ДОЛЖЕН совпадать с Auth.tsx !!!
-const API_BASE = import.meta.env.VITE_API_BASE || "https://cloudcompliance.duckdns.org/api/aiw";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://cloudcompliance.duckdns.org/api";
 
 // === Token helpers (sync with Auth.tsx) ===
 const getAccessToken = () => localStorage.getItem("auth_access");
