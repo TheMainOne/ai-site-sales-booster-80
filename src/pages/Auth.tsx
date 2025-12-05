@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "@/hooks/use-toast";
 
 // Если твои auth-роуты под /api/auth — оставь так; если под /api/aiw/auth — поменяй BASE
-const API_BASE = import.meta.env.VITE_API_BASE || "https://cloudcompliance.duckdns.org/api/aiw";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://cloudcompliance.duckdns.org/api";
 
 type BackendUser = {
   id?: string;
